@@ -2,14 +2,18 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight } from "lucide-react";
+import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart, GitCompare } from "lucide-react";
 import { api, formatINR, BUSINESS } from "@/lib/api";
 import { useCart } from "@/lib/cart";
+import { useWishlist } from "@/lib/wishlist";
+import { useCompare } from "@/lib/compare";
 import ProductCard from "@/components/ProductCard";
 
 export default function ProductDetail() {
   const { slug } = useParams();
   const { addItem } = useCart();
+  const { toggle: toggleWl, has: inWl } = useWishlist();
+  const { toggle: toggleCmp, has: inCmp } = useCompare();
   const [product, setProduct] = useState(null);
   const [related, setRelated] = useState([]);
   const [qty, setQty] = useState(1);
@@ -172,6 +176,25 @@ export default function ProductDetail() {
               <a href={whatsappUrl} target="_blank" rel="noreferrer" className="btn-accent" data-testid="whatsapp-order-btn">
                 <MessageCircle className="w-4 h-4" /> WhatsApp Order
               </a>
+              <button
+                onClick={() => { toggleWl(product); toast.success(inWl(product.id) ? "Removed from wishlist" : "Saved to wishlist"); }}
+                className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 border font-semibold text-sm transition ${
+                  inWl(product.id) ? "bg-rose-500 text-white border-rose-500" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+                data-testid="wl-toggle-detail"
+              >
+                <Heart className={`w-4 h-4 ${inWl(product.id) ? "fill-current" : ""}`} />
+                {inWl(product.id) ? "Saved" : "Save"}
+              </button>
+              <button
+                onClick={() => toggleCmp(product)}
+                className={`inline-flex items-center justify-center gap-2 rounded-full px-5 py-3 border font-semibold text-sm transition ${
+                  inCmp(product.id) ? "bg-brand-emerald text-white border-brand-emerald" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
+                data-testid="cmp-toggle-detail"
+              >
+                <GitCompare className="w-4 h-4" /> {inCmp(product.id) ? "Comparing" : "Compare"}
+              </button>
               <Link to="/bulk-order" className="btn-secondary">Request Quote</Link>
             </div>
 

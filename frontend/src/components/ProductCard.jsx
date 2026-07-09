@@ -1,17 +1,30 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShoppingCart, ArrowUpRight } from "lucide-react";
+import { ShoppingCart, ArrowUpRight, Heart, GitCompare } from "lucide-react";
 import { formatINR } from "@/lib/api";
 import { useCart } from "@/lib/cart";
+import { useWishlist } from "@/lib/wishlist";
+import { useCompare } from "@/lib/compare";
 import { toast } from "sonner";
 
 export default function ProductCard({ product, index = 0 }) {
   const { addItem } = useCart();
+  const { toggle: toggleWl, has: inWl } = useWishlist();
+  const { toggle: toggleCmp, has: inCmp } = useCompare();
 
   const handleAdd = (e) => {
     e.preventDefault();
     addItem(product, product.moq || 1);
     toast.success(`${product.name} added to cart`, { description: `MOQ ${product.moq || 1} units` });
+  };
+  const handleWl = (e) => {
+    e.preventDefault();
+    toggleWl(product);
+    toast.success(inWl(product.id) ? "Removed from wishlist" : "Saved to wishlist");
+  };
+  const handleCmp = (e) => {
+    e.preventDefault();
+    toggleCmp(product);
   };
 
   return (
@@ -35,6 +48,28 @@ export default function ProductCard({ product, index = 0 }) {
           {product.featured && (
             <span className="chip !bg-emerald-50 !text-brand-emerald">Featured</span>
           )}
+        </div>
+        <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={handleWl}
+            className={`w-9 h-9 rounded-full backdrop-blur-md shadow-md flex items-center justify-center transition ${
+              inWl(product.id) ? "bg-rose-500 text-white" : "bg-white/90 text-slate-700 hover:bg-white"
+            }`}
+            data-testid={`wl-toggle-${product.slug}`}
+            aria-label="Toggle wishlist"
+          >
+            <Heart className={`w-4 h-4 ${inWl(product.id) ? "fill-current" : ""}`} />
+          </button>
+          <button
+            onClick={handleCmp}
+            className={`w-9 h-9 rounded-full backdrop-blur-md shadow-md flex items-center justify-center transition ${
+              inCmp(product.id) ? "bg-brand-emerald text-white" : "bg-white/90 text-slate-700 hover:bg-white"
+            }`}
+            data-testid={`cmp-toggle-${product.slug}`}
+            aria-label="Toggle compare"
+          >
+            <GitCompare className="w-4 h-4" />
+          </button>
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
       </Link>

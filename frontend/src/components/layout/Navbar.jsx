@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, ShoppingCart, Phone, Droplets, X } from "lucide-react";
+import { Menu, ShoppingCart, Phone, Droplets, X, Heart, GitCompare } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useWishlist } from "@/lib/wishlist";
+import { useCompare } from "@/lib/compare";
 import { BUSINESS } from "@/lib/api";
 
 const NAV = [
@@ -15,6 +17,8 @@ const NAV = [
 
 export default function Navbar() {
   const { count } = useCart();
+  const { count: wlCount } = useWishlist();
+  const { count: cmpCount } = useCompare();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const location = useLocation();
@@ -73,6 +77,32 @@ export default function Navbar() {
             <Phone className="w-4 h-4" strokeWidth={1.8} />
             {BUSINESS.phoneDisplay}
           </a>
+          <Link
+            to="/wishlist"
+            className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
+            data-testid="nav-wishlist"
+            aria-label="Wishlist"
+          >
+            <Heart className="w-5 h-5 text-slate-700" strokeWidth={1.8} />
+            {wlCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {wlCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            to="/compare"
+            className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
+            data-testid="nav-compare"
+            aria-label="Compare"
+          >
+            <GitCompare className="w-5 h-5 text-slate-700" strokeWidth={1.8} />
+            {cmpCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand-emerald text-white text-[10px] font-bold flex items-center justify-center">
+                {cmpCount}
+              </span>
+            )}
+          </Link>
           <Link
             to="/cart"
             className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 flex items-center justify-center transition"

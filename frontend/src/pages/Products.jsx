@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { Search, SlidersHorizontal } from "lucide-react";
-import { api } from "@/lib/api";
+import { Search, SlidersHorizontal, Download } from "lucide-react";
+import { api, API } from "@/lib/api";
 import ProductCard from "@/components/ProductCard";
 import { Input } from "@/components/ui/input";
 
@@ -35,10 +35,21 @@ export default function Products() {
   return (
     <div className="py-12 md:py-16">
       <div className="container-x">
-        <div className="mb-10">
-          <div className="text-eyebrow mb-3">Product Catalogue</div>
-          <h1 className="h-hero !text-4xl md:!text-5xl">All Products</h1>
-          <p className="text-slate-600 mt-3 max-w-2xl">Explore our complete range of packaged drinking water — bottles from 250ml to 5L, 20L jars, corporate & event supply, and custom-branded solutions.</p>
+        <div className="mb-10 flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+          <div>
+            <div className="text-eyebrow mb-3">Product Catalogue</div>
+            <h1 className="h-hero !text-4xl md:!text-5xl">All Products</h1>
+            <p className="text-slate-600 mt-3 max-w-2xl">Explore our complete range of packaged drinking water — bottles from 250ml to 5L, 20L jars, corporate & event supply, and custom-branded solutions.</p>
+          </div>
+          <a
+            href={`${API}/catalogue.pdf`}
+            target="_blank"
+            rel="noreferrer"
+            className="btn-secondary shrink-0"
+            data-testid="download-catalogue"
+          >
+            <Download className="w-4 h-4" /> Download Catalogue PDF
+          </a>
         </div>
 
         <div className="grid lg:grid-cols-[280px_1fr] gap-8">

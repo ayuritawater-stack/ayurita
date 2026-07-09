@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { motion } from "framer-motion";
-import { Send, ShieldCheck, Truck, HeartHandshake } from "lucide-react";
-import { api } from "@/lib/api";
+import { Send, ShieldCheck, Truck, HeartHandshake, Download } from "lucide-react";
+import { api, API } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -68,6 +68,15 @@ export default function BulkOrder() {
               <p className="text-sky-100 text-sm mt-2 leading-relaxed">
                 Our bulk pricing is transparent and tiered — the more you order, the better the per-unit rate. Corporate contracts unlock the best rate.
               </p>
+              <a
+                href={`${API}/catalogue.pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full mt-4 px-5 py-2.5 bg-white text-brand-primary font-semibold text-sm hover:bg-sky-50 transition"
+                data-testid="download-catalogue-bulk"
+              >
+                <Download className="w-4 h-4" /> Download Full Catalogue PDF
+              </a>
             </div>
           </div>
 

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, X, User, MapPin, Phone, Mail, Package } from "lucide-react";
-import { api, formatINR } from "@/lib/api";
+import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown } from "lucide-react";
+import { api, formatINR, API } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUSES = ["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"];
@@ -198,7 +198,18 @@ export default function AdminOrders() {
                 </div>
               </div>
 
-              <button onClick={() => window.print()} className="btn-secondary w-full"><Package className="w-4 h-4" /> Print / Save Invoice</button>
+              <div className="grid grid-cols-2 gap-2">
+                <a
+                  href={`${API}/admin/orders/${detail.id}/invoice.pdf?token=${localStorage.getItem("ayurita_token")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-primary col-span-2"
+                  data-testid="download-invoice-pdf"
+                >
+                  <FileDown className="w-4 h-4" /> Download GST Invoice (PDF)
+                </a>
+                <button onClick={() => window.print()} className="btn-secondary col-span-2"><Package className="w-4 h-4" /> Print / Save Invoice</button>
+              </div>
             </div>
           </div>
         </div>

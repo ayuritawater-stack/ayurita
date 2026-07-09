@@ -13,7 +13,7 @@ const stats = [
   { label: "Quality Checks", value: "20+", icon: ShieldCheck },
   { label: "Fast Delivery", value: "24hr", icon: Truck },
   { label: "Purification Stages", value: "12", icon: FlaskConical },
-  { label: "Business Partners", value: "150+", icon: Users },
+  { label: "GST Invoicing", value: "100%", icon: TrendingUp },
 ];
 
 const industries = [
@@ -155,8 +155,8 @@ export default function Home() {
                 <CheckCircle2 className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs text-slate-500">ISI Certified</div>
-                <div className="text-sm font-semibold text-slate-900">Lab Tested Purity</div>
+                <div className="text-xs text-slate-500">Same-Day</div>
+                <div className="text-sm font-semibold text-slate-900">Dispatch Ready</div>
               </div>
             </motion.div>
             <motion.div
@@ -234,7 +234,7 @@ export default function Home() {
               Every drop of Ayurita water passes through our 12-stage purification process — from raw water intake to sealed bottling. Multi-media filtration, RO, UV, ozonation and mineral balancing ensure water that's crisp, clean and safe.
             </p>
             <div className="mt-8 space-y-3">
-              {["ISI certified plant", "20+ automated quality checks", "Zero-touch bottling & sealing", "GST invoicing & compliant packaging"].map((line) => (
+              {["Premium purification technology", "20+ automated quality checks", "Zero-touch bottling & sealing", "GST invoicing & compliant packaging"].map((line) => (
                 <div key={line} className="flex items-center gap-3">
                   <div className="w-6 h-6 rounded-full bg-emerald-50 text-brand-emerald flex items-center justify-center">
                     <CheckCircle2 className="w-4 h-4" />
@@ -279,7 +279,7 @@ export default function Home() {
           </div>
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             {[
-              { icon: ShieldCheck, title: "Certified Purity", desc: "ISI-certified, 20+ quality checks per batch, lab-tested every shift." },
+              { icon: ShieldCheck, title: "Certified Purity", desc: "20+ quality checks per batch, lab-tested every shift, sealed at source." },
               { icon: Truck, title: "Reliable Delivery", desc: "Same-day dispatch across Begusarai. Never miss a supply commitment." },
               { icon: TrendingUp, title: "Bulk Pricing", desc: "Aggressive bulk pricing tiers with transparent GST invoicing." },
             ].map((it) => (

@@ -22,7 +22,7 @@ export const BUSINESS = {
   email: "hello@ayurita.com",
   address: "Naulakha Path, Bishanpur, Begusarai, Mohan Eghu, Bihar 851129",
   deliveryArea: "Delivery Available Across Begusarai District",
-  hours: "Mon – Sat · 8:00 AM – 8:00 PM",
+  hours: "Mon – Sat · 9:00 AM – 7:00 PM",
   mapEmbed: "https://www.google.com/maps?q=Bishanpur,Begusarai,Bihar+851129&output=embed",
 };
 

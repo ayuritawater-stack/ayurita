@@ -1,0 +1,58 @@
+{
+  "summary": "Iteration 2 comprehensive testing on Ayurita B2B water website. Backend: 37/38 pytest tests passed. All regression endpoints (auth, products, categories, coupons, orders, bulk-inquiries, contact, analytics, admin CRUD) work after the router split. New endpoints validated: catalogue.pdf (public, ~4.8KB %PDF magic), invoice.pdf (via ?token= query works), and login rate limit (429 after >5 attempts/min). Frontend: All new features (wishlist, compare, catalogue download button on Products & BulkOrder, GST invoice download in admin drawer) render correctly and integrate with backend. Content: 'ISI' text fully removed from Home & About, hero stats show Quality Checks 20+/Fast Delivery 24hr/Purification Stages 12/GST Invoicing 100% (no 'Business Partners 150+'), About timeline has 4 entries all dated 2026 with no ISI Certification.\n\nTWO BUGS FOUND:\n1. BACKEND: /api/admin/orders/{id}/invoice.pdf does NOT accept the Authorization: Bearer header — only the ?token= query works. Spec says both should work.\n2. FRONTEND: ProductCard's wl-toggle & cmp-toggle buttons trigger the parent <Link>'s navigation, so clicking a heart/compare icon on a product card takes you to the product detail page instead of toggling. The wishlist/compare toggles work correctly on ProductDetail page (wl-toggle-detail, cmp-toggle-detail).",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/admin/orders/{order_id}/invoice.pdf",
+        "issue": "Endpoint does NOT honor Authorization: Bearer <jwt> header. Only ?token=<jwt> query param authenticates. Root cause in /app/backend/routers/invoices.py line 202: parameter `admin: dict | None = None` is NOT wrapped in Depends(get_current_admin), so FastAPI never injects the resolved admin. Fix: replace with an optional dependency pattern that tries Depends first and falls back to token query, OR explicitly check Authorization header inside the handler when token query is absent.",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProductCard.jsx (both wl-toggle-<slug> and cmp-toggle-<slug>)",
+        "issue": "Clicking the heart or compare button on a product card ALSO triggers the outer <Link to='/products/{slug}'> and navigates away to the product detail page. handleWl/handleCmp call e.preventDefault() but not e.stopPropagation(); the click event bubbles to the parent Link's onClick which then calls navigate(). Fix: add e.stopPropagation() (and ideally also handle onMouseDown) in handleWl and handleCmp at /app/frontend/src/components/ProductCard.jsx lines 20-28. Also the top-right icon container has `opacity-0 group-hover:opacity-100` which hides the buttons until hover — fine on desktop but not tappable on mobile without focus; consider making them always-visible on touch devices.",
+        "selector": "[data-testid^='wl-toggle-'] and [data-testid^='cmp-toggle-'] inside [data-testid^='product-card-']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix /app/backend/routers/invoices.py to make Bearer header auth work. Suggested: change signature to accept `authorization: str | None = Header(default=None)` and, when token query is missing, try to parse `Bearer <jwt>` from that header. Do not use `admin: dict | None = None` — it is never injected.",
+    "Fix /app/frontend/src/components/ProductCard.jsx handleWl and handleCmp — add `e.stopPropagation();` (and consider `e.nativeEvent?.stopImmediatePropagation?.();`) so clicking the icons does not navigate the parent Link. Also apply the same to handleAdd for consistency.",
+    "(Optional) Make wishlist/compare icons on ProductCard always visible on small viewports where hover doesn't fire, otherwise mobile users cannot access those toggles from listing.",
+    "(Optional) In /app/backend/routers/auth.py, the slowapi limiter is defined on `Limiter(key_func=get_remote_address)` — behind Cloudflare/K8s ingress, get_remote_address may resolve to the ingress IP causing all users to share one rate-limit bucket. Confirm X-Forwarded-For is honored or switch to a header-based key."
+  ],
+  "critical_code_review_comments": [
+    "invoices.py: `admin: dict | None = None` (line 202) without Depends() is a silent bug — the handler never gets an authenticated admin from Bearer header, only ?token= query works. This directly violates the review spec ('accepts either Authorization Bearer or ?token=').",
+    "ProductCard.jsx: Icon click handlers only call preventDefault, not stopPropagation. React events bubble to the parent <Link> whose onClick calls navigate() regardless of defaultPrevented — result: heart/compare click navigates away. Same anti-pattern would affect handleAdd but Add-to-Cart on ProductCard isn't inside the outer Link (it's below in the footer section outside the Link scope) so it works.",
+    "CORS is now tightened correctly: explicit origins in CORS_ORIGINS env with allow_credentials=True. Good.",
+    "Rate limit on /auth/login (5/min) is IP-based via get_remote_address. Behind a reverse proxy this may bucket all users together. Consider adding TrustedHostMiddleware/ProxyHeadersMiddleware for correct client IP, or use a per-email key.",
+    "Router split is clean and idiomatic — server.py is now a thin bootstrap (~80 lines). Good.",
+    "reportlab-based PDF generation adds latency (~200-400ms). Consider caching the catalogue PDF (products list changes rarely) with an ETag or in-memory TTL.",
+    "The Wishlist and Compare contexts persist in localStorage keys 'ayurita_wishlist_v1' and 'ayurita_compare_v1' — good versioning.",
+    "invoice.pdf URL exposes the JWT in querystring — it will appear in server access logs and browser history. Acceptable trade-off for <a download>, but flag as security note; consider generating short-lived per-order signed URLs instead of raw JWT."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {
+    "backend": "97% (37/38 — 1 spec-violation failure documented)",
+    "frontend": "95% — 1 known bug: ProductCard toggles nav to detail page instead of toggling"
+  },
+  "test_credentials": "Admin: admin@ayurita.com / Ayurita@2026 (verified). Coupon AYURITA10 (10% off, min ₹500) verified.",
+  "seed_data_creation": "Test data created: TEST_Biz orders (4-5 across runs), TEST_InvoiceCo order (1), TEST_Hotel bulk inquiry (1), TEST User contact message (1). Admin CRUD tests self-clean.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "38 pytest tests defined in /app/backend/tests/backend_test.py. Run with `-n 0` (serial) — rate-limit test (TestZZZRateLimit) MUST run last because tripping the 5/min limit poisons other login attempts. Frontend has data-testid coverage: product-card-<slug>, wl-toggle-<slug>, cmp-toggle-<slug>, wl-toggle-detail, cmp-toggle-detail, nav-wishlist, nav-compare, compare-bar, compare-open, compare-col-<slug>, wl-<slug>, wl-add-<slug>, wl-remove-<slug>, download-catalogue, download-catalogue-bulk, download-invoice-pdf, view-order-<order_number>. To re-test ProductCard toggle fix, click any `wl-toggle-<slug>` on /products and confirm URL does NOT change to /products/<slug> AND nav-wishlist badge count increments.",
+  "rca_of_the_issue": "Bug 1 (Bearer invoice): FastAPI parameter without Depends() → parameter is treated as request body/None default, never resolved. Fix by adding explicit Depends or manual Authorization header parsing. Bug 2 (ProductCard link nav): React event bubbling — nested button inside Link. preventDefault stops native anchor click but React Router's onClick handler runs on the bubbling click event, calls navigate() regardless of defaultPrevented state on newer versions. Solution: e.stopPropagation() in the child button handler."
+}

@@ -10,10 +10,9 @@ const values = [
 ];
 
 const timeline = [
-  { year: "2018", title: "Founded in Bishanpur", desc: "Started as a small bottling unit with 3 employees and a vision for pure water." },
-  { year: "2020", title: "ISI Certification", desc: "Achieved BIS certification and expanded to 12-stage purification process." },
-  { year: "2022", title: "50+ Business Partners", desc: "Crossed 50 recurring corporate & hotel supply contracts." },
-  { year: "2024", title: "Full Begusarai Coverage", desc: "Same-day delivery infrastructure across the entire district." },
+  { year: "2026", title: "Founded in Bishanpur", desc: "Started as a small bottling unit with a big vision — pure, reliable water for Bihar." },
+  { year: "2026", title: "50+ Business Partners", desc: "Crossed 50 recurring corporate & hotel supply contracts across Begusarai." },
+  { year: "2026", title: "Full Begusarai Coverage", desc: "Same-day delivery infrastructure across the entire district." },
   { year: "2026", title: "Custom Branding Launch", desc: "Introduced white-label water for corporate gifting and events." },
 ];
 
