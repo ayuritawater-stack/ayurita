@@ -1,0 +1,177 @@
+{
+  "project_name": "Ayurita Packaged Drinking Water",
+  "theme": "hybrid_fullstack",
+  "theme_strategy": "Light mode default for marketing/e-commerce to evoke purity and cleanliness. Dark mode strictly for the Admin Dashboard sidebar to create a command-center feel.",
+  "typography": {
+    "headings": {
+      "family": "Poppins",
+      "weights": ["600", "700"],
+      "usage": "Use tight letter spacing (tracking-tight) to elevate the font from feeling generic to looking editorial and premium.",
+      "styles": {
+        "h1": "text-5xl md:text-6xl font-bold tracking-tight text-gray-900 leading-tight",
+        "h2": "text-4xl md:text-5xl font-bold tracking-tight text-gray-900",
+        "h3": "text-2xl md:text-3xl font-semibold text-gray-900",
+        "h4": "text-xl font-semibold text-gray-900"
+      }
+    },
+    "body": {
+      "family": "Inter",
+      "weights": ["400", "500", "600"],
+      "usage": "Highly readable, structural font. Use for all data, descriptions, and functional UI.",
+      "styles": {
+        "large": "text-lg md:text-xl text-gray-600 leading-relaxed",
+        "base": "text-base text-gray-600 leading-relaxed",
+        "small": "text-sm text-gray-500"
+      }
+    },
+    "buttons": {
+      "family": "Inter",
+      "weights": ["600"],
+      "styles": "text-sm font-semibold tracking-wide uppercase or Title Case based on context"
+    }
+  },
+  "colors": {
+    "primary": {
+      "DEFAULT": "#0F4C81",
+      "description": "Deep Blue - Evokes trust, authority, and deep water.",
+      "hover": "#0C3D68",
+      "foreground": "#FFFFFF"
+    },
+    "secondary": {
+      "DEFAULT": "#38BDF8",
+      "description": "Sky Blue - Evokes freshness, hydration, and clarity.",
+      "hover": "#0EA5E9",
+      "foreground": "#0F4C81"
+    },
+    "accent": {
+      "DEFAULT": "#10B981",
+      "description": "Emerald Green - Health, natural purification, 'Ayurita' roots.",
+      "hover": "#059669",
+      "foreground": "#FFFFFF"
+    },
+    "background": {
+      "DEFAULT": "#F8FAFC",
+      "description": "Off-white background for reduced eye strain."
+    },
+    "surface": {
+      "card": "#FFFFFF",
+      "admin_sidebar": "#0F172A",
+      "admin_sidebar_hover": "#1E293B"
+    },
+    "text": {
+      "primary": "#111827",
+      "secondary": "#6B7280",
+      "muted": "#9CA3AF"
+    },
+    "border": {
+      "DEFAULT": "#E5E7EB",
+      "focus": "#38BDF8"
+    }
+  },
+  "visual_enhancers": {
+    "border_radius": {
+      "cards": "rounded-2xl",
+      "buttons": "rounded-full for primary actions, rounded-xl for secondary",
+      "inputs": "rounded-xl"
+    },
+    "glassmorphism": {
+      "header": "bg-white/70 backdrop-blur-xl border-b border-white/20 shadow-sm",
+      "overlay_cards": "bg-white/80 backdrop-blur-md border border-white/40 shadow-xl"
+    },
+    "shadows": {
+      "soft": "shadow-[0_8px_30px_rgb(0,0,0,0.04)]",
+      "hover": "shadow-[0_20px_40px_rgb(15,76,129,0.1)]",
+      "admin_card": "shadow-sm"
+    }
+  },
+  "layout_patterns": {
+    "spacing_strategy": "Generous spacing. Use py-24 or py-32 for sections. Cards need p-8 minimum.",
+    "hero": "Asymmetric split or full-screen with immersive image overlay. Overlay MUST NOT exceed bg-black/40. Use dramatic typography.",
+    "bento_grid": "For 'Features' and 'Quality Assurance', use an asymmetrical grid (e.g. one large card spanning 2 rows, surrounded by smaller metric cards).",
+    "admin_dashboard": "Sidebar (w-64) with fixed position. Content area with soft gray background (bg-slate-50). High-density metric cards (grid-cols-4).",
+    "ecommerce_sidebar": "Left sidebar (w-72) for filters (categories, size). Right area for product grid (grid-cols-1 md:grid-cols-2 lg:grid-cols-3) with large imagery.",
+    "card_design": "Clean white cards (rounded-2xl) with soft shadows. Image at top (max-h-64 object-cover), padded content area below. Do not use generic borders if shadow is present."
+  },
+  "motion": {
+    "philosophy": "Fluid like water. Smooth, easing transitions.",
+    "scroll": "Use Lenis for smooth scrolling.",
+    "animations": {
+      "fade_up": {
+        "initial": { "opacity": 0, "y": 40 },
+        "animate": { "opacity": 1, "y": 0 },
+        "transition": { "duration": 0.6, "ease": [0.22, 1, 0.36, 1] }
+      },
+      "stagger_children": {
+        "transition": { "staggerChildren": 0.1 }
+      },
+      "hover_lift": "hover:-translate-y-2 transition-transform duration-300 ease-out",
+      "image_zoom": "overflow-hidden. Image gets hover:scale-105 transition-transform duration-700 ease-in-out"
+    }
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.unsplash.com/photo-1776042675491-4eb9aaec9e71?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwxfHxwdXJlJTIwd2F0ZXIlMjBzcGxhc2glMjBtYWNybyUyMGJsdWV8ZW58MHx8fHwxNzgzNjAyMjYyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "A water droplet falling into rippling water surface, establishing extreme purity and clarity.",
+      "usage": "Main Hero Section background with bg-black/30 overlay."
+    },
+    "hero_alternative": {
+      "url": "https://images.unsplash.com/photo-1776042675246-c8fc67402ae2?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxwdXJlJTIwd2F0ZXIlMjBzcGxhc2glMjBtYWNybyUyMGJsdWV8ZW58MHx8fHwxNzgzNjAyMjYyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Water droplets falling into dark, rippling water.",
+      "usage": "Can be used for secondary hero or CTA banner backgrounds."
+    },
+    "products_bottle_1": {
+      "url": "https://images.unsplash.com/photo-1523362628745-0c100150b504?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwxfHxwcmVtaXVtJTIwY2xlYXIlMjB3YXRlciUyMGJvdHRsZSUyMG1pbmltYWx8ZW58MHx8fHwxNzgzNjAyMjYyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Clear drinking bottle filled with water.",
+      "usage": "Product representation for 1L / Premium bottle."
+    },
+    "products_bottle_2": {
+      "url": "https://images.unsplash.com/photo-1624469786827-13be4e09a992?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2MzR8MHwxfHNlYXJjaHwzfHxwcmVtaXVtJTIwY2xlYXIlMjB3YXRlciUyMGJvdHRsZSUyMG1pbmltYWx8ZW58MHx8fHwxNzgzNjAyMjYyfDA&ixlib=rb-4.1.0&q=85",
+      "description": "Black bottle beside clear drinking glass.",
+      "usage": "Product representation for corporate/premium custom branding."
+    },
+    "industry_hospitality": {
+      "url": "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBsdXh1cnklMjBkaW5pbmclMjBjYXRlcmluZyUyMGV2ZW50fGVufDB8fHx8MTc4MzYwMjI2Mnww&ixlib=rb-4.1.0&q=85",
+      "description": "Elegant table setting with floral centerpiece.",
+      "usage": "Industries section representing Hotels, Restaurants, and Events."
+    },
+    "industry_corporate": {
+      "url": "https://images.unsplash.com/photo-1740120424442-ccd013ec9581?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjY2NzV8MHwxfHNlYXJjaHw0fHxtb2Rlcm4lMjBsdXh1cnklMjBkaW5pbmclMjBjYXRlcmluZyUyMGV2ZW50fGVufDB8fHx8MTc4MzYwMjI2Mnww&ixlib=rb-4.1.0&q=85",
+      "description": "Long table set with flowers.",
+      "usage": "Industries section representing Corporate Offices and Marriage Halls."
+    }
+  },
+  "icons": {
+    "library": "lucide-react",
+    "stroke_width": 1.5,
+    "size": "w-6 h-6",
+    "usage": "Use crisp, thin icons. Avoid heavy filled icons. Wrap icons in rounded-full containers with subtle primary color background (e.g. bg-blue-50 text-primary) for visual pop."
+  },
+  "testing_attributes": {
+    "conventions": "Kebab-case, role-based. Every interactive element requires a data-testid.",
+    "examples": [
+      "data-testid='hero-cta-quote'",
+      "data-testid='nav-link-products'",
+      "data-testid='product-card-20L-jar'",
+      "data-testid='admin-sidebar-orders'",
+      "data-testid='form-submit-bulk-order'"
+    ]
+  },
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "NEVER create generic centered 'slop' layouts. Use asymmetric, overlapping bento grids for interest.",
+    "Use 2x-3x more padding than usual (e.g., py-24). Allow the white space to emphasize the premium nature of the brand.",
+    "Do not use generic 'inter' for headings. Strictly use Poppins Bold with tracking-tight.",
+    "Implement glassmorphism correctly: high blur (backdrop-blur-xl), slight white/dark tint, 1px subtle inner border.",
+    "Never use purely transparent header or overlays that sit over content without a blur.",
+    "Admin dashboard must use a dark theme for the sidebar (#0F172A) to contrast sharply with the light content area.",
+    "Add micro-interactions (hover lift, image zoom) to all cards and buttons.",
+    "Use Lucide-react for all icons, keeping stroke-width thin (1.5) for elegance.",
+    "Products page requires a robust e-commerce filter layout (sidebar + grid).",
+    "Forms must use Shadcn components but styled seamlessly with rounded-xl inputs and ample padding."
+  ],
+  "components_to_use": {
+    "navigation": "Sticky, glassmorphic header (bg-white/80, backdrop-blur-xl).",
+    "cards": "Clean white background, 16px border-radius, soft drop shadow, border-none unless explicitly needed for contrast.",
+    "buttons": "Pill-shaped (rounded-full) for primary actions, rounded-xl for secondary. Must have hover states (opacity change, or slight lift).",
+    "toasts": "Use 'sonner' for success/error states."
+  }
+}
