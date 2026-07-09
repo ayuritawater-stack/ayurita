@@ -64,8 +64,8 @@ export default function AdminDashboard() {
             </div>
             <div className="chip"><TrendingUp className="w-3 h-3" /> Live</div>
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
               <LineChart data={data.revenue_series} margin={{ left: -10, right: 5, top: 10, bottom: 0 }}>
                 <defs>
                   <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
@@ -88,8 +88,8 @@ export default function AdminDashboard() {
           {data.top_products.length === 0 ? (
             <div className="text-sm text-slate-500">No sales yet.</div>
           ) : (
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
+            <div className="h-64 w-full">
+              <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={200}>
                 <BarChart data={data.top_products} layout="vertical" margin={{ left: 0, right: 10 }}>
                   <XAxis type="number" fontSize={10} stroke="#94A3B8" />
                   <YAxis type="category" dataKey="name" fontSize={10} width={110} stroke="#64748B" />
