@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 3 retest of the two iteration-2 bugs. BACKEND FIX #1 FULLY VERIFIED — invoice.pdf now accepts Authorization Bearer header (200 + %PDF-), also accepts ?token= query (regression), returns 401 on no auth, 401 on invalid token, 404 on missing order. All 38 backend pytest cases pass, including the previously failing test_invoice_pdf_via_bearer_header. Login rate-limit (429) still trips after 5 attempts/min. FRONTEND FIX #2 PARTIALLY VERIFIED — the newly-added e.stopPropagation() on handleWl/handleCmp/handleAdd IS correct and works when a click actually reaches the button (verified via JS-dispatched click: URL stays on /products, nav-wishlist badge increments to 1, compare-bar appears). However, a SEPARATE pre-existing overlay bug still blocks real user clicks: the decorative gradient <div class='absolute inset-0 ... opacity-0 group-hover:opacity-100'> on ProductCard.jsx line 77 sits above the wl-toggle/cmp-toggle buttons in the stacking context (later sibling under the same parent Link) and INTERCEPTS pointer events. Verified via document.elementFromPoint(btnX, btnY) — top element at the button's center is that overlay div, NOT the button. Result: real mouse/tap clicks still navigate to the product detail page (because the click hits the overlay which is inside the Link), and the button's onClick never fires. Playwright's actionability check even refuses to click, complaining 'overlay div intercepts pointer events'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "ProductCard.jsx line 77 — gradient overlay div",
+        "issue": "The decorative <div class=\"absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity\"> is placed AFTER the top-right icon container in the DOM as a sibling under the outer <Link>. Because it fills the entire card image area (inset-0) and has no `pointer-events-none`, it lies on top of the wl-toggle and cmp-toggle buttons in hit-testing. Real user clicks (mouse, tap, Playwright) land on this overlay instead of the buttons — the click then bubbles to the parent <Link> which navigates to /products/<slug>. The button's own onClick (with the newly-added stopPropagation) is NEVER invoked. Fix: add `pointer-events-none` to the overlay's className (it is purely decorative and should not capture events), OR move the icon container to come AFTER the overlay in the JSX so it sits on top.",
+        "selector": "[data-testid='product-card-<slug>'] > a > div.absolute.inset-0.bg-gradient-to-t",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Add `pointer-events-none` to the gradient overlay div in /app/frontend/src/components/ProductCard.jsx (currently at line 77: `<div className='absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity' />`). Change to `className='pointer-events-none absolute inset-0 ...'`. This finishes Bug 2 fix — with pointer-events-none, real clicks will reach the wl-toggle/cmp-toggle buttons, at which point the already-in-place stopPropagation prevents navigation.",
+    "(Optional confirmation) After the fix, re-run: (a) click wl-toggle on /products → URL stays on /products, nav-wishlist badge = 1, `Saved to wishlist` toast. (b) click cmp-toggle → compare-bar visible, nav-compare badge = 1. (c) click product image → navigates to /products/<slug>. (d) click product name link → navigates to /products/<slug>."
+  ],
+  "critical_code_review_comments": [
+    "invoices.py auth: correctly reads Bearer header first (Authorization), then ?token= query, then access_token cookie — clean fallback chain. Uses pyjwt with JWT_SECRET env, checks role=='admin'. Good.",
+    "ProductCard.jsx: the stopPropagation fix on handleWl/handleCmp/handleAdd is correct and necessary (React Router v7's useLinkClickHandler runs on the Link's onClick during synthetic bubble; stopPropagation on child button prevents it). But by itself is INEFFECTIVE because clicks never reach the button due to the overlay intercepting them. A tiny sibling change (add pointer-events-none to the gradient overlay) will close the loop.",
+    "Rate limit on /auth/login (5/min) working — still IP-based via get_remote_address; behind Cloudflare/K8s ingress this may bucket all users together (previous iteration flag still relevant, but not the focus of this retest).",
+    "Reportlab PDF gen adds ~200-400ms latency; consider caching catalogue PDF with ETag or TTL (previous iteration flag; not blocking)."
+  ],
+  "updated_files": [],
+  "success_rate": {
+    "backend": "100% (38/38 pytest passed, including previously failing test_invoice_pdf_via_bearer_header)",
+    "frontend": "50% — Bug 2 stopPropagation fix is verified correct but rendered inert by a separate pre-existing overlay-pointer-events bug that still causes real clicks to navigate away"
+  },
+  "test_credentials": "Admin admin@ayurita.com / Ayurita@2026 (verified). Coupon AYURITA10 (10% off, min 500) verified.",
+  "seed_data_creation": "Test data created during pytest run: 1-2 TEST_Biz orders, 1 TEST_InvoiceCo order, 1 TEST_Hotel bulk inquiry, 1 TEST User contact message. Admin CRUD tests self-clean.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "The stopPropagation fix on ProductCard's handleWl/handleCmp is confirmed correct via JS-dispatched btn.click() tests. But the sibling overlay div (ProductCard.jsx line 77 — the `absolute inset-0 bg-gradient-to-t ... group-hover:opacity-100` gradient) intercepts real pointer events, so end-user clicks land on the overlay (inside the Link) → navigation happens before the button's onClick. Fix requires adding `pointer-events-none` to that overlay div's className. To verify: after fix, on desktop viewport at /products, run `document.elementFromPoint(x,y)` at the wl-toggle button's center — it must return the BUTTON element, not the overlay DIV. Also Playwright click(force=False) must not error with 'div intercepts pointer events'. Existing tests to reuse: /app/backend/tests/backend_test.py (38 tests, all pass; test_invoice_pdf_via_bearer_header specifically validates fix #1).",
+  "rca_of_the_issue": "BUG 1 (Bearer invoice) — FULLY RESOLVED. Root cause was that previous code used `admin: dict | None = None` as an FastAPI param without Depends, so admin never got injected. New code correctly uses `request: Request` and manually reads Authorization header / ?token= query / access_token cookie, validates via pyjwt against JWT_SECRET, and checks role=='admin'. Verified with pytest test_invoice_pdf_via_bearer_header → 200 + application/pdf + %PDF- magic bytes. BUG 2 (ProductCard toggle navigates) — TWO ROOT CAUSES, only 1 fixed: (a) [FIXED] handleWl/handleCmp called only e.preventDefault() and not e.stopPropagation(), so React Router v7 Link's onClick fired on bubble → main agent correctly added e.stopPropagation() and this now works when the button actually receives a click. (b) [STILL PRESENT] The gradient overlay div at ProductCard.jsx line 77 has `absolute inset-0` positioning and no `pointer-events-none` — being a later sibling of the icon container inside the Link, it wins hit-testing over the wl-toggle/cmp-toggle buttons. So a real user's mouse/tap click at the button's screen coordinates hits the overlay div instead of the button; that click bubbles to the parent Link which navigates. The button's onClick (with its stopPropagation) is never invoked. Verified via document.elementFromPoint(btnCenterX, btnCenterY) returning the overlay div. Also confirmed via direct JS `btn.click()` bypassing hit-testing: navigation is correctly prevented, badge increments, toast fires — proving the code fix is right, just unreachable. One-line fix: add `pointer-events-none` to that overlay's className."
+}

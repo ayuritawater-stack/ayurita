@@ -1,7 +1,7 @@
 """GST invoice PDF for admin."""
 import io
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -199,21 +199,31 @@ def _fmt_date(iso_str: str) -> str:
 
 
 @router.get("/admin/orders/{order_id}/invoice.pdf")
-async def admin_download_invoice(order_id: str, token: str | None = Query(default=None), admin: dict | None = None):
-    # Allow either standard auth OR token query param (browser <a href download>)
-    if admin is None:
-        # try to read from token query
-        if not token:
-            raise HTTPException(status_code=401, detail="Not authenticated")
-        # simple decode
-        import jwt as pyjwt
-        import os
-        try:
-            payload = pyjwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"])
-            if payload.get("role") != "admin":
-                raise HTTPException(status_code=401, detail="Invalid token")
-        except Exception:
+async def admin_download_invoice(
+    order_id: str,
+    request: Request,
+    token: str | None = Query(default=None),
+):
+    # Accept either Authorization: Bearer <jwt> header OR ?token= query param
+    import jwt as pyjwt
+    import os
+    jwt_str = token
+    if not jwt_str:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header.startswith("Bearer "):
+            jwt_str = auth_header[7:]
+        elif request.cookies.get("access_token"):
+            jwt_str = request.cookies.get("access_token")
+    if not jwt_str:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    try:
+        payload = pyjwt.decode(jwt_str, os.environ["JWT_SECRET"], algorithms=["HS256"])
+        if payload.get("role") != "admin":
             raise HTTPException(status_code=401, detail="Invalid token")
+    except pyjwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except pyjwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
