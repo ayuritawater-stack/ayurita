@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 export default function AdminLogin() {
   const nav = useNavigate();
   const { login, admin } = useAuth();
-  const [form, setForm] = useState({ email: "admin@ayurita.com", password: "Ayurita@2026" });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function AdminLogin() {
       </div>
 
       <div className="flex-1 flex items-center justify-center p-6 md:p-12 bg-slate-50">
-        <form onSubmit={submit} className="w-full max-w-md" data-testid="admin-login-form">
+        <form onSubmit={submit} className="w-full max-w-md" autoComplete="off" data-testid="admin-login-form">
           <div className="mb-8">
             <h1 className="font-heading font-bold text-3xl tracking-tight text-slate-900">Admin Login</h1>
             <p className="text-slate-500 text-sm mt-2">Sign in to manage your Ayurita business.</p>
@@ -74,6 +74,7 @@ export default function AdminLogin() {
                 <Input
                   id="email"
                   type="email"
+                  autoComplete="off"
                   required
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -89,6 +90,7 @@ export default function AdminLogin() {
                 <Input
                   id="password"
                   type="password"
+                  autoComplete="off"
                   required
                   value={form.password}
                   onChange={(e) => setForm({ ...form, password: e.target.value })}
