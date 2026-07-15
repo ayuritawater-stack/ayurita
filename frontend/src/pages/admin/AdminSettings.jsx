@@ -22,6 +22,16 @@ const EMPTY = {
   free_shipping_above: 0,
 };
 
+const errorMessage = (err, fallback) => {
+  const detail = err.response?.data?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d) => d?.msg || d?.type).filter(Boolean);
+    if (msgs.length) return msgs.join("; ");
+  }
+  return fallback;
+};
+
 export default function AdminSettings() {
   const [settings, setSettings] = useState(EMPTY);
   const [loading, setLoading] = useState(true);
@@ -31,9 +41,9 @@ export default function AdminSettings() {
     setLoading(true);
     try {
       const { data } = await api.get("/admin/settings");
-      setSettings(data);
+      setSettings((prev) => ({ ...prev, ...data }));
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to load settings");
+      toast.error(errorMessage(err, "Failed to load settings"));
     } finally {
       setLoading(false);
     }
@@ -49,7 +59,7 @@ export default function AdminSettings() {
     setSaving(true);
     try {
       const payload = {
-        ...settings,
+        ...Object.fromEntries(Object.keys(EMPTY).map((key) => [key, settings[key]])),
         tax_rate: Number(settings.tax_rate || 0),
         shipping_flat: Number(settings.shipping_flat || 0),
         free_shipping_above: Number(settings.free_shipping_above || 0),
@@ -57,7 +67,7 @@ export default function AdminSettings() {
       await api.put("/admin/settings", payload);
       toast.success("Settings saved");
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Save failed");
+      toast.error(errorMessage(err, "Save failed"));
     } finally {
       setSaving(false);
     }
