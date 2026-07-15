@@ -1,8 +1,9 @@
 import { Link } from "react-router-dom";
 import { Droplets, Phone, Mail, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
-import { BUSINESS } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 
 export default function Footer() {
+  const BUSINESS = useSettings();
   return (
     <footer className="bg-slate-900 text-slate-300" data-testid="site-footer">
       <div className="container-x py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">

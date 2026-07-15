@@ -78,7 +78,7 @@ def _notify_order_status(order: dict) -> None:
         logger.exception("Failed to send WhatsApp status notification for order %s", order.get("order_number"))
 
 
-def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optional[dict]):
+def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optional[dict], shipping_settings: dict):
     subtotal = 0.0
     gst_total = 0.0
     order_items = []
@@ -109,7 +109,9 @@ def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optiona
             discount = subtotal * (coupon["value"] / 100)
         else:
             discount = coupon["value"]
-    shipping = 0.0 if subtotal >= 500 else 50.0
+    free_above = shipping_settings.get("free_shipping_above", 500.0)
+    flat = shipping_settings.get("shipping_flat", 50.0)
+    shipping = 0.0 if subtotal >= free_above else flat
     grand_total = round(subtotal - discount + gst_total + shipping, 2)
     return {
         "items": order_items,
@@ -134,7 +136,8 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
     if body.coupon_code:
         coupon = await db.coupons.find_one({"code": body.coupon_code.upper().strip(), "is_active": True}, {"_id": 0})
 
-    totals = _compute_totals(products_map, body.items, coupon)
+    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0, "shipping_flat": 1, "free_shipping_above": 1}) or {}
+    totals = _compute_totals(products_map, body.items, coupon, settings)
     order_number = gen_order_number()
     now_str = iso(now_utc())
     order = {

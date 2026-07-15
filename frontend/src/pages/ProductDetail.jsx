@@ -3,12 +3,14 @@ import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart } from "lucide-react";
-import { api, formatINR, BUSINESS } from "@/lib/api";
+import { api, formatINR } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import ProductCard from "@/components/ProductCard";
 
 export default function ProductDetail() {
+  const BUSINESS = useSettings();
   const { slug } = useParams();
   const { addItem } = useCart();
   const { toggle: toggleWl, has: inWl } = useWishlist();

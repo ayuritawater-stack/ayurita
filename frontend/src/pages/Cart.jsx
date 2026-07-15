@@ -1,10 +1,12 @@
 import { Link } from "react-router-dom";
 import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useSettings } from "@/lib/settings";
 import { formatINR } from "@/lib/api";
 
 export default function Cart() {
   const { items, removeItem, updateQty, subtotal } = useCart();
+  const { shippingFlat, freeShippingAbove } = useSettings();
 
   if (items.length === 0) {
     return (
@@ -24,7 +26,7 @@ export default function Cart() {
   }
 
   const gst = subtotal * 0.18;
-  const shipping = subtotal >= 500 ? 0 : 50;
+  const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
   const total = subtotal + gst + shipping;
 
   return (

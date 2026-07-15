@@ -3,7 +3,8 @@ import { Link, NavLink, useLocation } from "react-router-dom";
 import { Menu, ShoppingCart, Phone, Droplets, X, Heart, User } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
-import { BUSINESS, isCustomerLoggedIn } from "@/lib/api";
+import { isCustomerLoggedIn } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -16,6 +17,7 @@ const NAV = [
 ];
 
 export default function Navbar() {
+  const BUSINESS = useSettings();
   const { count } = useCart();
   const { count: wlCount } = useWishlist();
   const [open, setOpen] = useState(false);

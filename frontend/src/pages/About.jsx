@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Award, HeartHandshake, Target, Sparkles, ShieldCheck, Leaf, Droplets } from "lucide-react";
-import { BUSINESS } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 
 const values = [
   { icon: ShieldCheck, title: "Uncompromising Quality", desc: "Every batch tested. Every bottle sealed. Every promise kept." },
@@ -17,6 +17,7 @@ const timeline = [
 ];
 
 export default function About() {
+  const BUSINESS = useSettings();
   return (
     <div>
       {/* Hero */}

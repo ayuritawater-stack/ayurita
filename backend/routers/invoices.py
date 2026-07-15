@@ -23,14 +23,28 @@ TEXT = colors.HexColor("#111827")
 MUTED = colors.HexColor("#6B7280")
 LINE = colors.HexColor("#E5E7EB")
 
-BUSINESS = {
+DEFAULT_BUSINESS = {
     "name": "Ayurita Packaged Drinking Water",
     "tagline": "Pure Water. Trusted Quality.",
-    "address": "Naulakha Path, Bishanpur, Begusarai, Mohan Eghu, Bihar 851129",
-    "phone": "+91 99732 51687",
+    "address": "Naulakha Path, Bishanpur, Begusarai, Bihar 851129",
+    "phone": "+919973251687",
     "email": "hello@ayurita.com",
-    "gstin": "10ABCDE1234F1Z5",  # placeholder
+    "gstin": "",
 }
+
+
+async def _get_business() -> dict:
+    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0})
+    if not settings:
+        return DEFAULT_BUSINESS
+    return {
+        "name": settings.get("business_name") or DEFAULT_BUSINESS["name"],
+        "tagline": settings.get("tagline") or DEFAULT_BUSINESS["tagline"],
+        "address": settings.get("address") or DEFAULT_BUSINESS["address"],
+        "phone": settings.get("phone") or DEFAULT_BUSINESS["phone"],
+        "email": settings.get("email") or DEFAULT_BUSINESS["email"],
+        "gstin": settings.get("gstin") or DEFAULT_BUSINESS["gstin"],
+    }
 
 
 def _rupees(n):
@@ -41,7 +55,7 @@ def _rupees(n):
     return f"Rs. {n:,.2f}"
 
 
-def _build_invoice_pdf(order: dict) -> io.BytesIO:
+def _build_invoice_pdf(order: dict, BUSINESS: dict) -> io.BytesIO:
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -208,7 +222,7 @@ async def public_download_invoice(request: Request, order_number: str = Path(pat
         raise HTTPException(status_code=404, detail="Order not found")
     if order.get("status") != "delivered":
         raise HTTPException(status_code=403, detail="Invoice will be available for download once your order is delivered.")
-    buf = _build_invoice_pdf(order)
+    buf = _build_invoice_pdf(order, await _get_business())
     filename = f"Ayurita-Invoice-{order['order_number']}.pdf"
     return StreamingResponse(
         buf,
@@ -248,7 +262,7 @@ async def admin_download_invoice(
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    buf = _build_invoice_pdf(order)
+    buf = _build_invoice_pdf(order, await _get_business())
     filename = f"Ayurita-Invoice-{order['order_number']}.pdf"
     return StreamingResponse(
         buf,

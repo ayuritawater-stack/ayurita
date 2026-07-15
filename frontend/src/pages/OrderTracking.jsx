@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Search, Package, CheckCircle2, Clock, Truck, ArrowRight, FileText, MessageCircle, Circle } from "lucide-react";
-import { api, formatINR, API, BUSINESS } from "@/lib/api";
+import { api, formatINR, API } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
@@ -15,6 +16,7 @@ const STAGES = [
 ];
 
 export default function OrderTracking() {
+  const BUSINESS = useSettings();
   const { orderNumber: paramOrder } = useParams();
   const nav = useNavigate();
   const [orderNo, setOrderNo] = useState(paramOrder || "");

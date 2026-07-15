@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
 import { CheckCircle2, ArrowRight, Wallet } from "lucide-react";
 import { useCart } from "@/lib/cart";
+import { useSettings } from "@/lib/settings";
 import { api, formatINR } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ const loadRazorpayScript = () =>
 
 export default function Checkout() {
   const nav = useNavigate();
+  const { shippingFlat, freeShippingAbove } = useSettings();
   const { items, subtotal, clear } = useCart();
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState("cod");
@@ -72,7 +74,7 @@ export default function Checkout() {
 
   const discount = couponData ? (couponData.discount_type === "percent" ? subtotal * (couponData.value / 100) : couponData.value) : 0;
   const gst = (subtotal - discount) * 0.18;
-  const shipping = subtotal >= 500 ? 0 : 50;
+  const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
   const total = subtotal - discount + gst + shipping;
 
   const placeOrder = async (e) => {

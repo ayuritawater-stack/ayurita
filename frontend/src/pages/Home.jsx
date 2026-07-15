@@ -5,7 +5,8 @@ import {
   Droplets, ShieldCheck, Truck, FlaskConical, Building2, Utensils, HeartPulse, School, PartyPopper,
   Factory, ArrowRight, CheckCircle2, MapPin, Phone, MessageCircle, Star, Sparkles, Users, TrendingUp,
 } from "lucide-react";
-import { api, BUSINESS } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import ProductCard from "@/components/ProductCard";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -49,6 +50,7 @@ const faqs = [
 ];
 
 export default function Home() {
+  const BUSINESS = useSettings();
   const [featured, setFeatured] = useState([]);
 
   useEffect(() => {

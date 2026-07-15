@@ -26,15 +26,31 @@ DEFAULT_SETTINGS = {
     "updated_at": None,
 }
 
-@router.get("/admin/settings")
-async def get_settings(admin: dict = Depends(get_current_admin)):
+PUBLIC_FIELDS = [
+    "business_name", "tagline", "address", "phone", "whatsapp",
+    "email", "gstin", "business_hours", "shipping_flat", "free_shipping_above",
+]
+
+
+async def _get_or_create_settings() -> dict:
     settings = await db.settings.find_one({"id": SETTINGS_ID}, {"_id": 0})
     if not settings:
         DEFAULT_SETTINGS["created_at"] = iso(now_utc())
         DEFAULT_SETTINGS["updated_at"] = iso(now_utc())
         await db.settings.replace_one({"id": SETTINGS_ID}, DEFAULT_SETTINGS, upsert=True)
-        return DEFAULT_SETTINGS
+        return dict(DEFAULT_SETTINGS)
     return settings
+
+
+@router.get("/settings")
+async def get_public_settings():
+    settings = await _get_or_create_settings()
+    return {k: settings.get(k, DEFAULT_SETTINGS.get(k)) for k in PUBLIC_FIELDS}
+
+
+@router.get("/admin/settings")
+async def get_settings(admin: dict = Depends(get_current_admin)):
+    return await _get_or_create_settings()
 
 @router.put("/admin/settings")
 async def update_settings(body: SettingsIn, request: Request, admin: dict = Depends(get_current_admin)):

@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { CartProvider } from "@/lib/cart";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { WishlistProvider } from "@/lib/wishlist";
+import { SettingsProvider } from "@/lib/settings";
 import PublicLayout from "@/components/layout/PublicLayout";
 import Home from "@/pages/Home";
 import Products from "@/pages/Products";
@@ -50,6 +51,7 @@ function ScrollToTop() {
 
 function App() {
   return (
+    <SettingsProvider>
     <AuthProvider>
       <WishlistProvider>
         <CartProvider>
@@ -103,6 +105,7 @@ function App() {
         </CartProvider>
       </WishlistProvider>
     </AuthProvider>
+    </SettingsProvider>
   );
 }
 

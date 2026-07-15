@@ -1,12 +1,14 @@
 import { useState } from "react";
 import { toast } from "sonner";
 import { Phone, Mail, MapPin, Clock, MessageCircle, Send } from "lucide-react";
-import { api, BUSINESS } from "@/lib/api";
+import { api } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 
 export default function Contact() {
+  const BUSINESS = useSettings();
   const [form, setForm] = useState({ name: "", email: "", phone: "", subject: "", message: "" });
   const [submitting, setSubmitting] = useState(false);
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));

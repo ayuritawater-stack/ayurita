@@ -1,7 +1,8 @@
 import { MessageCircle } from "lucide-react";
-import { BUSINESS } from "@/lib/api";
+import { useSettings } from "@/lib/settings";
 
 export default function WhatsAppFloat() {
+  const BUSINESS = useSettings();
   const url = `https://wa.me/${BUSINESS.whatsapp}?text=${encodeURIComponent(
     "Hello Ayurita, I'd like to enquire about your packaged drinking water supply.",
   )}`;
