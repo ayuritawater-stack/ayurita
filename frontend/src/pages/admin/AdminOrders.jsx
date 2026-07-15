@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown } from "lucide-react";
 import { api, formatINR, API } from "@/lib/api";
@@ -22,14 +22,14 @@ export default function AdminOrders() {
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const params = filter !== "all" ? { status: filter } : {};
     const { data } = await api.get("/admin/orders", { params });
     setOrders(data);
     setLoading(false);
-  };
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
   const changeStatus = async (id, status) => {
     try {

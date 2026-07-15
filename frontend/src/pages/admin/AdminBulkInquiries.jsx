@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Eye, X, User, Phone, Mail, MessageSquare } from "lucide-react";
 import { api } from "@/lib/api";
@@ -21,14 +21,14 @@ export default function AdminBulkInquiries() {
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     const params = filter !== "all" ? { status: filter } : {};
     const { data } = await api.get("/admin/bulk-inquiries", { params });
     setItems(data);
     setLoading(false);
-  };
-  useEffect(() => { load(); }, [filter]);
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
 
   const update = async (status, admin_reply) => {
     try {
