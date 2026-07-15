@@ -1,17 +1,31 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { toast } from "sonner";
-import { CheckCircle2, ArrowRight } from "lucide-react";
+import { CheckCircle2, ArrowRight, Wallet } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { api, formatINR } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import CouponDropdown from "@/components/CouponDropdown";
+
+const loadRazorpayScript = () =>
+  new Promise((resolve, reject) => {
+    if (window.Razorpay) return resolve();
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Unable to load Razorpay script"));
+    document.body.appendChild(script);
+  });
 
 export default function Checkout() {
   const nav = useNavigate();
   const { items, subtotal, clear } = useCart();
   const [submitting, setSubmitting] = useState(false);
+  const [payment, setPayment] = useState("cod");
   const [coupon, setCoupon] = useState("");
   const [couponData, setCouponData] = useState(null);
   const [form, setForm] = useState({
@@ -26,6 +40,23 @@ export default function Checkout() {
   });
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  // Pre-fill from the signed-in customer's saved profile (Account page) so returning buyers
+  // don't retype their business details every order - still fully editable per order below.
+  useEffect(() => {
+    api.get("/customer/profile").then(({ data }) => {
+      setForm((f) => ({
+        ...f,
+        business_name: data.business_name || f.business_name,
+        contact_person: data.contact_person || f.contact_person,
+        phone: data.phone || f.phone,
+        email: data.email || f.email,
+        address: data.address || f.address,
+        city: data.city || f.city,
+        gst_number: data.gst_number || f.gst_number,
+      }));
+    }).catch(() => {});
+  }, []);
 
   const applyCoupon = async () => {
     if (!coupon) return;
@@ -53,15 +84,60 @@ export default function Checkout() {
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
         guest: form,
         coupon_code: couponData ? couponData.code : null,
-        payment_method: "cod",
+        payment_method: payment,
       };
       const { data } = await api.post("/orders", payload);
+
+      if (payment === "online") {
+        await loadRazorpayScript();
+        const { data: paymentData } = await api.post("/payment/create-order", { order_id: data.id });
+
+        const rzp = new window.Razorpay({
+          key: paymentData.key_id,
+          amount: paymentData.amount,
+          currency: paymentData.currency,
+          name: "Ayurita Packaged Drinking Water",
+          description: `Order ${paymentData.razorpay_order_id ? data.order_number : ""}`,
+          order_id: paymentData.razorpay_order_id,
+          prefill: { name: form.contact_person, email: form.email, contact: form.phone },
+          theme: { color: "#0F4C81" },
+          modal: {
+            ondismiss: () => {
+              toast.error("Payment was cancelled");
+              setSubmitting(false);
+            },
+          },
+          handler: async (response) => {
+            try {
+              await api.post("/payment/verify", {
+                order_id: data.id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+              clear();
+              toast.success("Payment successful! Order placed.");
+              nav(`/order-success/${data.order_number}`);
+            } catch (err) {
+              toast.error(err.response?.data?.detail || "Payment verification failed");
+            } finally {
+              setSubmitting(false);
+            }
+          },
+        });
+        // From here, submitting stays true until the Razorpay modal's handler/ondismiss
+        // resets it - not this function's finally, which has already run by the time the
+        // user interacts with the modal.
+        rzp.open();
+        return;
+      }
+
       clear();
       toast.success("Order placed successfully!");
       nav(`/order-success/${data.order_number}`);
+      setSubmitting(false);
     } catch (err) {
       toast.error(err.response?.data?.detail || "Failed to place order");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -123,13 +199,26 @@ export default function Checkout() {
 
             <div className="card-premium p-6">
               <div className="font-heading font-bold text-lg mb-4">Payment Method</div>
-              <div className="p-4 rounded-xl border border-brand-primary bg-sky-50 flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-brand-primary" />
-                <div>
-                  <div className="font-semibold text-slate-900">Cash on Delivery / Quote-Based</div>
-                  <div className="text-xs text-slate-600">We'll confirm your order and share GST invoice for payment</div>
-                </div>
-              </div>
+              <RadioGroup value={payment} onValueChange={setPayment} className="grid gap-3">
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${payment === "cod" ? "border-brand-primary bg-sky-50" : "border-slate-200"}`}>
+                  <RadioGroupItem value="cod" id="pm-cod" data-testid="payment-cod" className="mt-0.5" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 font-semibold text-slate-900">
+                      <CheckCircle2 className="w-4 h-4 text-brand-primary" /> Cash on Delivery / Quote-Based
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">We'll confirm your order and share GST invoice for payment.</div>
+                  </div>
+                </label>
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition ${payment === "online" ? "border-brand-primary bg-sky-50" : "border-slate-200"}`}>
+                  <RadioGroupItem value="online" id="pm-online" data-testid="payment-online" className="mt-0.5" />
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 font-semibold text-slate-900">
+                      <Wallet className="w-4 h-4 text-brand-primary" /> Pay Online (Razorpay)
+                    </div>
+                    <div className="text-xs text-slate-600 mt-0.5">Pay securely with UPI, cards, net banking or wallets via Razorpay.</div>
+                  </div>
+                </label>
+              </RadioGroup>
             </div>
           </div>
 
@@ -157,6 +246,9 @@ export default function Checkout() {
                 <button type="button" onClick={applyCoupon} className="btn-secondary !py-2.5" data-testid="apply-coupon">Apply</button>
               </div>
               {couponData && <div className="text-xs text-brand-emerald font-semibold mt-2">✓ {couponData.code} applied</div>}
+              <div className="mt-4">
+                <CouponDropdown onSelect={(code) => { setCoupon(code); }} />
+              </div>
             </div>
 
             <div className="mt-4 space-y-2 text-sm">
@@ -171,7 +263,7 @@ export default function Checkout() {
             </div>
 
             <button type="submit" disabled={submitting} className="btn-primary w-full mt-6 disabled:opacity-60" data-testid="place-order-btn">
-              {submitting ? "Placing…" : "Place Order"} <ArrowRight className="w-4 h-4" />
+              {submitting ? (payment === "online" ? "Processing payment…" : "Placing…") : payment === "online" ? "Pay Now" : "Place Order"} <ArrowRight className="w-4 h-4" />
             </button>
           </aside>
         </form>

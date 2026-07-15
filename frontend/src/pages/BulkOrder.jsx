@@ -51,7 +51,7 @@ export default function BulkOrder() {
             <div className="grid sm:grid-cols-3 gap-4 mt-10">
               {[
                 { icon: ShieldCheck, label: "GST invoicing" },
-                { icon: Truck, label: "Same-day dispatch" },
+                { icon: Truck, label: "Same day under 20 km" },
                 { icon: HeartHandshake, label: "Dedicated manager" },
               ].map((b) => (
                 <div key={b.label} className="card-premium p-4 flex items-center gap-3">

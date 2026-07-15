@@ -84,7 +84,7 @@ export default function Home() {
               transition={{ duration: 0.7, delay: 0.15 }}
               className="text-slate-600 text-base md:text-lg leading-relaxed mt-6 max-w-2xl"
             >
-              Reliable wholesale and bulk packaged drinking water supplier delivering premium quality water across Begusarai District. 20+ quality checks. Same-day dispatch. GST-compliant invoicing.
+              Reliable wholesale and bulk packaged drinking water supplier delivering premium quality water across Begusarai District. 20+ quality checks. Same-day dispatch for orders under 20 km; orders beyond 20 km are dispatched in 3 days. GST-compliant invoicing.
             </motion.p>
 
             <motion.div
@@ -169,8 +169,8 @@ export default function Home() {
                 <Truck className="w-5 h-5" />
               </div>
               <div>
-                <div className="text-xs text-slate-500">Delivery in</div>
-                <div className="text-sm font-semibold text-slate-900">Under 24 hours</div>
+                <div className="text-xs text-slate-500">Dispatch policy</div>
+                <div className="text-sm font-semibold text-slate-900">Same day under 20 km</div>
               </div>
             </motion.div>
           </motion.div>
@@ -280,7 +280,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-6 mt-12">
             {[
               { icon: ShieldCheck, title: "Certified Purity", desc: "20+ quality checks per batch, lab-tested every shift, sealed at source." },
-              { icon: Truck, title: "Reliable Delivery", desc: "Same-day dispatch across Begusarai. Never miss a supply commitment." },
+              { icon: Truck, title: "Reliable Delivery", desc: "Same-day dispatch for orders under 20 km; orders beyond 20 km are dispatched in 3 days." },
               { icon: TrendingUp, title: "Bulk Pricing", desc: "Aggressive bulk pricing tiers with transparent GST invoicing." },
             ].map((it) => (
               <div key={it.title} className="glass-dark p-6 rounded-2xl">
@@ -328,7 +328,7 @@ export default function Home() {
             <div className="text-eyebrow mb-3">Delivery Coverage</div>
             <h2 className="h-section">Serving Every Corner of Begusarai District</h2>
             <p className="text-slate-600 mt-5 leading-relaxed">
-              Our logistics team covers Begusarai city, Barauni, Teghra, Bakhri, Ballia, Bihat, Cheria Bariarpur, Matihani, Sahebpur Kamal and all surrounding areas. Same-day dispatch for orders placed before 2 PM.
+              Our logistics team covers Begusarai city, Barauni, Teghra, Bakhri, Ballia, Bihat, Cheria Bariarpur, Matihani, Sahebpur Kamal and all surrounding areas. Same-day dispatch for orders under 20 km; orders beyond 20 km are dispatched in 3 days.
             </p>
             <div className="mt-6 space-y-3">
               <div className="flex items-center gap-3 text-sm text-slate-700">

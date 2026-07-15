@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, ShoppingCart, Phone, Droplets, X, Heart, GitCompare } from "lucide-react";
+import { Menu, ShoppingCart, Phone, Droplets, X, Heart, User } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
-import { useCompare } from "@/lib/compare";
-import { BUSINESS } from "@/lib/api";
+import { BUSINESS, isCustomerLoggedIn } from "@/lib/api";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -12,16 +11,19 @@ const NAV = [
   { to: "/categories", label: "Categories" },
   { to: "/bulk-order", label: "Bulk Order" },
   { to: "/about", label: "About" },
+  { to: "/order-tracking", label: "Track Order" },
   { to: "/contact", label: "Contact" },
 ];
 
 export default function Navbar() {
   const { count } = useCart();
   const { count: wlCount } = useWishlist();
-  const { count: cmpCount } = useCompare();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const [customerIn, setCustomerIn] = useState(isCustomerLoggedIn());
   const location = useLocation();
+
+  useEffect(() => setCustomerIn(isCustomerLoggedIn()), [location.pathname]);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -50,7 +52,7 @@ export default function Navbar() {
           </div>
         </Link>
 
-        <nav className="hidden lg:flex items-center gap-1">
+        <nav className="hidden xl:flex items-center gap-0.5">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -58,7 +60,7 @@ export default function Navbar() {
               end={item.to === "/"}
               data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, "-")}`}
               className={({ isActive }) =>
-                `px-4 py-2 text-sm font-medium rounded-full transition-all ${
+                `px-3 py-2 text-sm font-medium rounded-full whitespace-nowrap transition-all ${
                   isActive ? "bg-sky-50 text-brand-primary" : "text-slate-700 hover:bg-slate-50"
                 }`
               }
@@ -71,12 +73,20 @@ export default function Navbar() {
         <div className="flex items-center gap-2 md:gap-3">
           <a
             href={`tel:${BUSINESS.phone}`}
-            className="hidden md:inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-brand-primary transition"
+            className="hidden xl:inline-flex items-center gap-2 text-sm font-semibold text-slate-700 hover:text-brand-primary transition whitespace-nowrap"
             data-testid="nav-phone"
           >
             <Phone className="w-4 h-4" strokeWidth={1.8} />
             {BUSINESS.phoneDisplay}
           </a>
+          <Link
+            to={customerIn ? "/account" : "/signin"}
+            className="w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
+            data-testid="nav-account"
+            aria-label={customerIn ? "My Account" : "Sign In"}
+          >
+            <User className="w-5 h-5 text-slate-700" strokeWidth={1.8} />
+          </Link>
           <Link
             to="/wishlist"
             className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
@@ -87,19 +97,6 @@ export default function Navbar() {
             {wlCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {wlCount}
-              </span>
-            )}
-          </Link>
-          <Link
-            to="/compare"
-            className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
-            data-testid="nav-compare"
-            aria-label="Compare"
-          >
-            <GitCompare className="w-5 h-5 text-slate-700" strokeWidth={1.8} />
-            {cmpCount > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand-emerald text-white text-[10px] font-bold flex items-center justify-center">
-                {cmpCount}
               </span>
             )}
           </Link>
@@ -119,7 +116,7 @@ export default function Navbar() {
             Request Quote
           </Link>
           <button
-            className="lg:hidden w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center"
+            className="xl:hidden w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center"
             onClick={() => setOpen((v) => !v)}
             data-testid="nav-menu-toggle"
             aria-label="Toggle menu"
@@ -130,7 +127,7 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="lg:hidden bg-white border-t border-slate-100" data-testid="mobile-nav">
+        <div className="xl:hidden bg-white border-t border-slate-100" data-testid="mobile-nav">
           <div className="container-x py-4 flex flex-col gap-1">
             {NAV.map((item) => (
               <NavLink

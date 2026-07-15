@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const NAV = [
@@ -10,6 +10,8 @@ const NAV = [
   { to: "/admin/bulk-inquiries", label: "Bulk Inquiries", icon: MessagesSquare },
   { to: "/admin/contact-messages", label: "Contact Messages", icon: Mail },
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent },
+  { to: "/admin/settings", label: "Settings", icon: Droplets },
+  { to: "/admin/profile", label: "Profile", icon: UserCircle },
 ];
 
 export default function AdminLayout() {
@@ -59,14 +61,16 @@ export default function AdminLayout() {
             <ExternalLink className="w-3.5 h-3.5" /> View Public Site
           </Link>
           <div className="mt-2 p-3 rounded-xl bg-slate-800 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center text-white text-xs font-bold">
-              {admin?.name?.[0] || "A"}
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs text-white truncate">{admin?.name}</div>
-              <div className="text-[10px] text-slate-400 truncate">{admin?.email}</div>
-            </div>
-            <button onClick={onLogout} data-testid="admin-logout" className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-rose-500 text-slate-300 hover:text-white flex items-center justify-center transition" aria-label="Logout">
+            <Link to="/admin/profile" className="flex-1 min-w-0 flex items-center gap-3 group" data-testid="admin-profile-link">
+              <div className="w-8 h-8 rounded-full bg-brand-primary flex items-center justify-center text-white text-xs font-bold shrink-0">
+                {admin?.name?.[0] || "A"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs text-white truncate group-hover:underline">{admin?.name}</div>
+                <div className="text-[10px] text-slate-400 truncate">{admin?.email}</div>
+              </div>
+            </Link>
+            <button onClick={onLogout} data-testid="admin-logout" className="w-8 h-8 rounded-lg bg-slate-700 hover:bg-rose-500 text-slate-300 hover:text-white flex items-center justify-center transition shrink-0" aria-label="Logout">
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>

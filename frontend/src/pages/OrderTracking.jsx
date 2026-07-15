@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Search, Package, CheckCircle2, Clock, Truck, ArrowRight } from "lucide-react";
-import { api, formatINR } from "@/lib/api";
+import { toast } from "sonner";
+import { Search, Package, CheckCircle2, Clock, Truck, ArrowRight, FileText, MessageCircle, Circle } from "lucide-react";
+import { api, formatINR, API, BUSINESS } from "@/lib/api";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 
 const STAGES = [
-  { key: "placed", label: "Order Placed", icon: Package },
+  { key: "placed", label: "Order Placed", icon: Clock },
   { key: "confirmed", label: "Confirmed", icon: CheckCircle2 },
-  { key: "processing", label: "Processing", icon: Clock },
   { key: "packed", label: "Packed", icon: Package },
-  { key: "dispatched", label: "Dispatched", icon: Truck },
+  { key: "dispatched", label: "Out for Delivery", icon: Truck },
   { key: "delivered", label: "Delivered", icon: CheckCircle2 },
 ];
 
@@ -46,11 +47,19 @@ export default function OrderTracking() {
     doSearch(orderNo.trim());
   };
 
+  const handleDownloadInvoice = () => {
+    if (order.status !== "delivered") {
+      toast.error("Invoice will be available for download once your order is delivered.");
+      return;
+    }
+    window.open(`${API}/orders/${order.order_number}/invoice.pdf`, "_blank", "noopener,noreferrer");
+  };
+
   const currentIndex = order ? STAGES.findIndex((s) => s.key === order.status) : -1;
 
   return (
     <div className="py-12 md:py-16">
-      <div className="container-x max-w-4xl">
+      <div className="container-x">
         <div className="mb-10 max-w-xl">
           <div className="text-eyebrow mb-3">Track Order</div>
           <h1 className="h-hero !text-4xl md:!text-5xl">Where's my order?</h1>
@@ -75,70 +84,127 @@ export default function OrderTracking() {
 
         {error && <div className="mt-6 p-4 rounded-xl bg-rose-50 text-rose-700 text-sm">{error}</div>}
 
-        {order && (
-          <div className="mt-10">
+        {order && order.status === "cancelled" && (
+          <div className="mt-6 p-4 rounded-xl bg-rose-50 text-rose-700 text-sm font-medium">This order has been cancelled.</div>
+        )}
+
+        {order && order.status !== "cancelled" && (
+          <div className="mt-8 space-y-4">
             <div className="card-premium p-6 md:p-8">
-              <div className="flex flex-wrap justify-between gap-4 pb-6 border-b border-slate-100">
+              <div className="flex items-center justify-between flex-wrap gap-3">
                 <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-500">Order Number</div>
-                  <div className="font-heading font-bold text-xl text-slate-900" data-testid="order-number">{order.order_number}</div>
+                  <div className="text-xs uppercase tracking-wider text-slate-500">Order</div>
+                  <div className="font-heading font-bold text-lg text-slate-900" data-testid="order-number">{order.order_number}</div>
                 </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-500">Grand Total</div>
-                  <div className="font-heading font-bold text-xl text-slate-900">{formatINR(order.grand_total)}</div>
-                </div>
-                <div>
-                  <div className="text-xs uppercase tracking-wider text-slate-500">Status</div>
-                  <div className="mt-0.5">
-                    <span className="chip !bg-emerald-50 !text-brand-emerald capitalize">{order.status}</span>
-                  </div>
-                </div>
+                <Badge className="text-sm uppercase bg-brand-primary hover:bg-brand-primary">{order.status}</Badge>
               </div>
 
-              {/* Timeline */}
-              <div className="mt-8 relative">
-                <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-slate-100" />
-                <div className="space-y-6">
+              {/* Horizontal stepper */}
+              <div className="mt-8">
+                <div className="hidden sm:flex items-center justify-between relative">
+                  <div className="absolute top-5 left-5 right-5 h-1 bg-slate-100 rounded-full">
+                    <div
+                      className="h-full bg-brand-primary rounded-full transition-all"
+                      style={{ width: `${(Math.max(0, currentIndex) / (STAGES.length - 1)) * 100}%` }}
+                    />
+                  </div>
                   {STAGES.map((s, i) => {
                     const done = i <= currentIndex;
-                    const active = i === currentIndex;
-                    const timelineEvent = order.timeline?.find((t) => t.status === s.key);
                     return (
-                      <div key={s.key} className="flex items-start gap-4 relative" data-testid={`timeline-${s.key}`}>
-                        <div className={`w-12 h-12 rounded-full flex items-center justify-center relative z-10 shrink-0 ${
-                          done ? "bg-brand-primary text-white" : "bg-slate-100 text-slate-400"
-                        } ${active ? "ring-4 ring-sky-100" : ""}`}>
-                          <s.icon className="w-5 h-5" />
+                      <div key={s.key} className="relative flex flex-col items-center gap-2 flex-1" data-testid={`timeline-${s.key}`}>
+                        <div
+                          className={`h-10 w-10 rounded-full grid place-items-center border-2 ${
+                            done ? "bg-brand-primary border-brand-primary text-white" : "bg-white border-slate-200 text-slate-400"
+                          }`}
+                        >
+                          <s.icon className="h-4 w-4" />
                         </div>
-                        <div className="flex-1 pt-2">
-                          <div className={`font-semibold ${done ? "text-slate-900" : "text-slate-400"}`}>{s.label}</div>
-                          {timelineEvent && (
-                            <div className="text-xs text-slate-500 mt-0.5">
-                              {new Date(timelineEvent.at).toLocaleString("en-IN")}
-                            </div>
-                          )}
+                        <div className={`text-xs font-medium text-center ${done ? "text-slate-900" : "text-slate-400"}`}>{s.label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Mobile stepper */}
+                <div className="sm:hidden space-y-3">
+                  {STAGES.map((s, i) => {
+                    const done = i <= currentIndex;
+                    return (
+                      <div key={s.key} className="flex items-center gap-3">
+                        <div className={`h-9 w-9 rounded-full grid place-items-center ${done ? "bg-brand-primary text-white" : "bg-slate-100 text-slate-400"}`}>
+                          <s.icon className="h-4 w-4" />
                         </div>
+                        <div className={`text-sm ${done ? "text-slate-900" : "text-slate-400"}`}>{s.label}</div>
                       </div>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Items */}
-              <div className="mt-8 pt-6 border-t border-slate-100">
-                <div className="font-heading font-semibold text-slate-900 mb-4">Order Items</div>
-                <div className="space-y-3">
-                  {order.items?.map((it, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      {it.image && <img src={it.image} alt={it.product_name} className="w-12 h-12 rounded-lg object-cover" />}
-                      <div className="flex-1">
-                        <div className="font-semibold text-slate-900">{it.product_name}</div>
-                        <div className="text-xs text-slate-500">{it.size} · Qty {it.quantity} × {formatINR(it.unit_price)}</div>
+              {/* Timeline log */}
+              {order.timeline?.length > 0 && (
+                <div className="mt-8 border-t border-slate-100 pt-4">
+                  <div className="text-xs font-semibold uppercase text-slate-500 mb-3">Timeline</div>
+                  <div className="space-y-2">
+                    {[...order.timeline].reverse().map((h, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <Circle className="h-2 w-2 fill-brand-primary text-brand-primary shrink-0" />
+                        <span className="font-medium capitalize text-slate-900">{h.status}</span>
+                        {h.note && <span className="text-xs text-slate-500">{h.note}</span>}
+                        <span className="text-slate-400 text-xs ml-auto whitespace-nowrap">{h.at?.slice(0, 16).replace("T", " ")}</span>
                       </div>
-                      <div className="font-semibold text-slate-900">{formatINR(it.line_total)}</div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Order details */}
+            <div className="card-premium p-6 md:p-8">
+              <div className="font-heading font-semibold text-slate-900 mb-4">Order Details</div>
+              <div className="space-y-2 text-sm">
+                {order.items?.map((it, i) => (
+                  <div key={i} className="flex justify-between">
+                    <div className="text-slate-700">{it.product_name} × {it.quantity}</div>
+                    <div className="text-slate-900">{formatINR(it.line_total)}</div>
+                  </div>
+                ))}
+                <div className="border-t border-slate-100 pt-2 flex justify-between text-slate-700">
+                  <span>Subtotal</span><span>{formatINR(order.subtotal)}</span>
+                </div>
+                {order.discount > 0 && (
+                  <div className="flex justify-between text-brand-emerald">
+                    <span>Discount</span><span>-{formatINR(order.discount)}</span>
+                  </div>
+                )}
+                {order.shipping > 0 && (
+                  <div className="flex justify-between text-slate-700">
+                    <span>Shipping</span><span>{formatINR(order.shipping)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-heading font-bold text-lg pt-1 text-slate-900">
+                  <span>Total</span><span>{formatINR(order.grand_total)}</span>
+                </div>
+              </div>
+              <div className="mt-4 grid sm:grid-cols-2 gap-2 text-xs text-slate-500">
+                <div>
+                  <b className="text-slate-700">Delivery:</b> {order.guest?.contact_person}, {order.guest?.address}, {order.guest?.city}
+                </div>
+                <div>
+                  <b className="text-slate-700">Payment:</b> {order.payment_method?.toUpperCase()}
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={handleDownloadInvoice} className="btn-secondary" data-testid="track-download-invoice">
+                  <FileText className="w-4 h-4" /> Download Invoice PDF
+                </button>
+                <a
+                  href={`https://wa.me/${BUSINESS.whatsapp}?text=${encodeURIComponent(`Hi, I want an update on order ${order.order_number}`)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn-secondary"
+                >
+                  <MessageCircle className="w-4 h-4" /> WhatsApp
+                </a>
               </div>
             </div>
           </div>

@@ -4,11 +4,10 @@ import logging
 from fastapi import FastAPI, APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 from deps import client
 from seed import run_seed
+from security import SecureHeadersMiddleware
 from routers import auth as r_auth
 from routers import categories as r_categories
 from routers import products as r_products
@@ -19,16 +18,14 @@ from routers import contact as r_contact
 from routers import analytics as r_analytics
 from routers import invoices as r_invoices
 from routers import catalogue as r_catalogue
+from routers import settings as r_settings
+from routers import customer as r_customer
+from routers import payments as r_payments
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ayurita")
 
 app = FastAPI(title="Ayurita Packaged Drinking Water API")
-
-# Rate limiter (attached from auth router)
-app.state.limiter = r_auth.limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
 
 api = APIRouter(prefix="/api")
 
@@ -49,8 +46,13 @@ api.include_router(r_contact.router)
 api.include_router(r_analytics.router)
 api.include_router(r_invoices.router)
 api.include_router(r_catalogue.router)
+api.include_router(r_settings.router)
+api.include_router(r_customer.router)
+api.include_router(r_payments.router)
 
 app.include_router(api)
+
+app.add_middleware(SecureHeadersMiddleware)
 
 # CORS — restrict to configured origins (comma-separated). Fallback to *.
 _origins_env = os.environ.get("CORS_ORIGINS", "*").strip()
@@ -70,9 +72,22 @@ app.add_middleware(
 )
 
 
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    # Catches anything not already handled by FastAPI's own HTTPException/validation-error
+    # handlers (both of which stay intact and take precedence). Full detail - including the
+    # traceback - goes to the server log only; the client only ever sees a generic message, never
+    # a stack trace, file path, or raw database error.
+    logger.exception("Unhandled exception on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Something went wrong. Please try again."})
+
+
 @app.on_event("startup")
 async def _startup():
-    await run_seed()
+    try:
+        await run_seed()
+    except Exception as exc:
+        logger.warning("Startup seeding skipped: %s", exc)
 
 
 @app.on_event("shutdown")

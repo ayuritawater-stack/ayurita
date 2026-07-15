@@ -145,6 +145,11 @@ class TestAdminProtection:
         assert r.status_code == 401
 
 
+    def test_unauthenticated_settings(self, api_client):
+        r = api_client.get(f"{API}/admin/settings")
+        assert r.status_code == 401
+
+
 # ---------------- Coupons ----------------
 class TestCoupons:
     def test_validate_valid_coupon_with_min_order(self, api_client):
@@ -323,6 +328,33 @@ class TestCataloguePDF:
         body = r.content
         assert len(body) > 1024, f"PDF too small: {len(body)} bytes"
         assert body.startswith(b"%PDF-"), "Body does not start with %PDF- magic bytes"
+
+
+# ---------------- NEW: Public Invoice PDF ----------------
+class TestPublicInvoicePDF:
+    @pytest.fixture(scope="class")
+    def order_number(self, api_client, seeded_products):
+        p = next(x for x in seeded_products if x["slug"] == "ayurita-500ml")
+        body = {
+            "items": [{"product_id": p["id"], "quantity": 20}],
+            "guest": {
+                "business_name": "TEST_PublicInvoiceCo", "contact_person": "Pub Inv Test",
+                "phone": "9111111112", "email": "pubinv@example.com",
+                "address": "42 Public Rd", "city": "Begusarai",
+                "gst_number": "10ABCDE1234F1Z5",
+            },
+            "payment_method": "cod",
+        }
+        r = api_client.post(f"{API}/orders", json=body)
+        assert r.status_code == 200
+        return r.json()["order_number"]
+
+    def test_public_invoice_pdf(self, api_client, order_number):
+        r = api_client.get(f"{API}/orders/{order_number}/invoice.pdf")
+        assert r.status_code == 200, r.text
+        assert r.headers.get("content-type", "").startswith("application/pdf")
+        assert r.content.startswith(b"%PDF-")
+        assert len(r.content) > 1024
 
 
 # ---------------- NEW: Invoice PDF (admin) ----------------

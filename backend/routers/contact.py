@@ -1,5 +1,7 @@
 """Contact messages router."""
-from fastapi import APIRouter, Depends
+from typing import Literal
+from fastapi import APIRouter, Depends, Request, Path
+import deps
 from deps import db, get_current_admin, new_id, now_utc, iso
 from models import ContactMessageIn
 
@@ -7,7 +9,8 @@ router = APIRouter(tags=["contact"])
 
 
 @router.post("/contact")
-async def create_contact_message(body: ContactMessageIn):
+async def create_contact_message(body: ContactMessageIn, request: Request):
+    deps.check_public_rate_limit(request, "contact_submit")
     doc = body.model_dump()
     doc["id"] = new_id()
     doc["status"] = "new"
@@ -23,6 +26,12 @@ async def admin_list_contact(admin: dict = Depends(get_current_admin)):
 
 
 @router.put("/admin/contact-messages/{msg_id}/status")
-async def update_contact_status(msg_id: str, status: str, admin: dict = Depends(get_current_admin)):
+async def update_contact_status(
+    status: Literal["new", "read"],
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+    msg_id: str = Path(min_length=1, max_length=64),
+):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     await db.contact_messages.update_one({"id": msg_id}, {"$set": {"status": status}})
     return {"ok": True}

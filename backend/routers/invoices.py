@@ -1,7 +1,7 @@
 """GST invoice PDF for admin."""
 import io
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, HTTPException, Query, Request, Path
 from fastapi.responses import StreamingResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
@@ -11,7 +11,9 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
 )
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
+import deps
 from deps import db, get_current_admin
+from models import ORDER_NUMBER_REGEX
 
 router = APIRouter(tags=["invoices"])
 
@@ -198,11 +200,28 @@ def _fmt_date(iso_str: str) -> str:
         return iso_str[:10]
 
 
+@router.get("/orders/{order_number}/invoice.pdf")
+async def public_download_invoice(request: Request, order_number: str = Path(pattern=ORDER_NUMBER_REGEX)):
+    deps.check_public_rate_limit(request, "invoice_download")
+    order = await db.orders.find_one({"order_number": order_number.upper().strip()}, {"_id": 0})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.get("status") != "delivered":
+        raise HTTPException(status_code=403, detail="Invoice will be available for download once your order is delivered.")
+    buf = _build_invoice_pdf(order)
+    filename = f"Ayurita-Invoice-{order['order_number']}.pdf"
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/admin/orders/{order_id}/invoice.pdf")
 async def admin_download_invoice(
-    order_id: str,
     request: Request,
-    token: str | None = Query(default=None),
+    token: str | None = Query(default=None, max_length=2000),
+    order_id: str = Path(min_length=1, max_length=64),
 ):
     # Accept either Authorization: Bearer <jwt> header OR ?token= query param
     import jwt as pyjwt
@@ -225,6 +244,7 @@ async def admin_download_invoice(
     except pyjwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    deps.check_authenticated_rate_limit(request, "admin_write", payload.get("sub", "unknown"))
     order = await db.orders.find_one({"id": order_id}, {"_id": 0})
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")

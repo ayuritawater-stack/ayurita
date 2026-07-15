@@ -1,5 +1,6 @@
 """Categories router."""
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request, Path
+import deps
 from deps import db, get_current_admin, new_id, now_utc, iso
 from models import CategoryIn
 
@@ -13,7 +14,8 @@ async def list_categories():
 
 
 @router.post("/categories")
-async def create_category(body: CategoryIn, admin: dict = Depends(get_current_admin)):
+async def create_category(body: CategoryIn, request: Request, admin: dict = Depends(get_current_admin)):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     if await db.categories.find_one({"slug": body.slug}):
         raise HTTPException(status_code=400, detail="Slug already exists")
     doc = body.model_dump()
@@ -25,7 +27,13 @@ async def create_category(body: CategoryIn, admin: dict = Depends(get_current_ad
 
 
 @router.put("/categories/{cat_id}")
-async def update_category(cat_id: str, body: CategoryIn, admin: dict = Depends(get_current_admin)):
+async def update_category(
+    body: CategoryIn,
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+    cat_id: str = Path(min_length=1, max_length=64),
+):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     res = await db.categories.update_one({"id": cat_id}, {"$set": body.model_dump()})
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Category not found")
@@ -33,6 +41,11 @@ async def update_category(cat_id: str, body: CategoryIn, admin: dict = Depends(g
 
 
 @router.delete("/categories/{cat_id}")
-async def delete_category(cat_id: str, admin: dict = Depends(get_current_admin)):
+async def delete_category(
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+    cat_id: str = Path(min_length=1, max_length=64),
+):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     await db.categories.delete_one({"id": cat_id})
     return {"ok": True}

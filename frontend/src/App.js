@@ -18,6 +18,10 @@ import About from "@/pages/About";
 import Contact from "@/pages/Contact";
 import BulkOrder from "@/pages/BulkOrder";
 import Wishlist from "@/pages/Wishlist";
+import SignIn from "@/pages/SignIn";
+import SignUp from "@/pages/SignUp";
+import Account from "@/pages/Account";
+import CustomerProtectedRoute from "@/components/CustomerProtectedRoute";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminLayout from "@/components/layout/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
@@ -27,6 +31,8 @@ import AdminBulkInquiries from "@/pages/admin/AdminBulkInquiries";
 import AdminContactMessages from "@/pages/admin/AdminContactMessages";
 import AdminCoupons from "@/pages/admin/AdminCoupons";
 import AdminCategories from "@/pages/admin/AdminCategories";
+import AdminSettings from "@/pages/admin/AdminSettings";
+import AdminProfile from "@/pages/admin/AdminProfile";
 
 function AdminRoute({ children }) {
   const { admin, loading } = useAuth();
@@ -57,7 +63,6 @@ function App() {
                 <Route path="/products/:slug" element={<ProductDetail />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-tracking" element={<OrderTracking />} />
                 <Route path="/order-tracking/:orderNumber" element={<OrderTracking />} />
                 <Route path="/order-success/:orderNumber" element={<OrderSuccess />} />
@@ -65,6 +70,13 @@ function App() {
                 <Route path="/contact" element={<Contact />} />
                 <Route path="/bulk-order" element={<BulkOrder />} />
                 <Route path="/wishlist" element={<Wishlist />} />
+                <Route path="/signin" element={<SignIn />} />
+                <Route path="/signup" element={<SignUp />} />
+
+                <Route element={<CustomerProtectedRoute />}>
+                  <Route path="/checkout" element={<Checkout />} />
+                  <Route path="/account" element={<Account />} />
+                </Route>
               </Route>
 
               <Route path="/admin/login" element={<AdminLogin />} />
@@ -83,9 +95,11 @@ function App() {
                 <Route path="bulk-inquiries" element={<AdminBulkInquiries />} />
                 <Route path="contact-messages" element={<AdminContactMessages />} />
                 <Route path="coupons" element={<AdminCoupons />} />
+                <Route path="settings" element={<AdminSettings />} />
+                <Route path="profile" element={<AdminProfile />} />
               </Route>
             </Routes>
-          </BrowserRouter>
+            </BrowserRouter>
         </CartProvider>
       </WishlistProvider>
     </AuthProvider>
