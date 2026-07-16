@@ -24,6 +24,7 @@ async def run_seed():
                     "password_hash": hash_password(admin_password),
                     "name": "Ayurita Admin",
                     "role": "admin",
+                    "admin_role": "owner",
                     "created_at": iso(now_utc()),
                 })
                 logger.info("Admin seeded")

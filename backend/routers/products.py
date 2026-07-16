@@ -3,7 +3,7 @@ import re
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Path, Query
 import deps
-from deps import db, get_current_admin, new_id, now_utc, iso
+from deps import db, get_current_admin, require_owner, new_id, now_utc, iso
 from models import ProductIn
 
 router = APIRouter(tags=["products"])
@@ -54,7 +54,7 @@ async def admin_list_products(admin: dict = Depends(get_current_admin)):
 
 
 @router.post("/products")
-async def create_product(body: ProductIn, request: Request, admin: dict = Depends(get_current_admin)):
+async def create_product(body: ProductIn, request: Request, admin: dict = Depends(require_owner)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     if await db.products.find_one({"slug": body.slug}):
         raise HTTPException(status_code=400, detail="Slug already exists")
@@ -71,7 +71,7 @@ async def create_product(body: ProductIn, request: Request, admin: dict = Depend
 async def update_product(
     body: ProductIn,
     request: Request,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_owner),
     product_id: str = Path(min_length=1, max_length=64),
 ):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
@@ -86,7 +86,7 @@ async def update_product(
 @router.delete("/products/{product_id}")
 async def delete_product(
     request: Request,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_owner),
     product_id: str = Path(min_length=1, max_length=64),
 ):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])

@@ -1,5 +1,6 @@
 """Orders router."""
 import logging
+from datetime import timedelta
 from typing import Literal, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request, Path
 import deps
@@ -136,7 +137,7 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
     if body.coupon_code:
         coupon = await db.coupons.find_one({"code": body.coupon_code.upper().strip(), "is_active": True}, {"_id": 0})
 
-    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0, "shipping_flat": 1, "free_shipping_above": 1}) or {}
+    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0}) or {}
     totals = _compute_totals(products_map, body.items, coupon, settings)
     order_number = gen_order_number()
     now_str = iso(now_utc())
@@ -153,6 +154,37 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
         "created_at": now_str,
         "updated_at": now_str,
     }
+
+    if body.payment_method == "credit":
+        # Buy-now-pay-later on a wholesale credit line. The limit is owner-set (see
+        # routers/credit.py) and only ever grows via explicit admin action, never via a
+        # customer request, so it's safe to trust the value already on the customer document
+        # fetched by get_current_customer.
+        credit_limit = customer.get("credit_limit", 0.0)
+        if credit_limit <= 0:
+            raise HTTPException(status_code=400, detail="Your account isn't enabled for credit orders yet. Contact us to set up a wholesale credit line.")
+        available = credit_limit - customer.get("credit_balance", 0.0)
+        if totals["grand_total"] > available:
+            raise HTTPException(status_code=400, detail=f"This order exceeds your available credit (₹{available:,.2f} remaining).")
+        due_days = settings.get("credit_due_days", 30)
+        order["credit_due_date"] = iso(now_utc() + timedelta(days=due_days))
+        order["amount_paid"] = 0.0
+        order["credit_status"] = "unpaid"
+        await db.customers.update_one({"id": customer["id"]}, {"$inc": {"credit_balance": totals["grand_total"]}})
+
+    # Flag unusually large orders, and a customer's very first credit order, so the admin
+    # order list surfaces them for a closer look before fulfillment starts - a compromised
+    # account or a fat-fingered quantity is far more consequential above these thresholds.
+    flag_reasons = []
+    if totals["grand_total"] >= settings.get("large_order_threshold", 20000.0):
+        flag_reasons.append("large_order")
+    if body.payment_method == "credit":
+        prior_credit_orders = await db.orders.count_documents({"customer_id": customer["id"], "payment_method": "credit"})
+        if prior_credit_orders == 0:
+            flag_reasons.append("first_credit_order")
+    order["flagged_for_review"] = bool(flag_reasons)
+    order["flag_reasons"] = flag_reasons
+
     await db.orders.insert_one(order)
     order.pop("_id", None)
     _notify_order_placed(order)
@@ -171,12 +203,15 @@ async def track_order(request: Request, order_number: str = Path(pattern=ORDER_N
 @router.get("/admin/orders")
 async def admin_list_orders(
     status: Optional[Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]] = None,
+    customer_id: Optional[str] = None,
     admin: dict = Depends(get_current_admin),
 ):
     try:
         filt: dict = {}
         if status:
             filt["status"] = status
+        if customer_id:
+            filt["customer_id"] = customer_id
         return await db.orders.find(filt, {"_id": 0}).sort("created_at", -1).to_list(1000)
     except Exception as e:
         import logging

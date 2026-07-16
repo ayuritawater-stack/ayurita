@@ -1,22 +1,31 @@
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle, Users, Star, Wallet, Undo2, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
 const NAV = [
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, ownerOnly: true },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
-  { to: "/admin/products", label: "Products", icon: Package },
-  { to: "/admin/categories", label: "Categories", icon: FolderTree },
+  { to: "/admin/products", label: "Products", icon: Package, ownerOnly: true },
+  { to: "/admin/categories", label: "Categories", icon: FolderTree, ownerOnly: true },
   { to: "/admin/bulk-inquiries", label: "Bulk Inquiries", icon: MessagesSquare },
   { to: "/admin/contact-messages", label: "Contact Messages", icon: Mail },
-  { to: "/admin/coupons", label: "Coupons", icon: TicketPercent },
-  { to: "/admin/settings", label: "Settings", icon: Droplets },
+  { to: "/admin/reviews", label: "Reviews", icon: Star },
+  { to: "/admin/returns", label: "Returns & Refunds", icon: Undo2 },
+  { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, ownerOnly: true },
+  { to: "/admin/customers", label: "Customers & Credit", icon: Wallet, ownerOnly: true },
+  { to: "/admin/audit-log", label: "Audit Log", icon: ShieldCheck, ownerOnly: true },
+  { to: "/admin/settings", label: "Settings", icon: Droplets, ownerOnly: true },
+  { to: "/admin/staff", label: "Staff Accounts", icon: Users, ownerOnly: true },
   { to: "/admin/profile", label: "Profile", icon: UserCircle },
 ];
 
 export default function AdminLayout() {
   const { admin, logout } = useAuth();
   const nav = useNavigate();
+  // Admins created before sub-admin roles existed have no admin_role field - default to owner,
+  // matching the backend's require_owner default (see backend/deps.py).
+  const isStaff = (admin?.admin_role || "owner") === "staff";
+  const visibleNav = NAV.filter((item) => !item.ownerOnly || !isStaff);
 
   const onLogout = () => {
     logout();
@@ -37,7 +46,7 @@ export default function AdminLayout() {
           </div>
         </div>
         <nav className="flex-1 px-3 py-6 space-y-1 overflow-y-auto">
-          {NAV.map((item) => (
+          {visibleNav.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

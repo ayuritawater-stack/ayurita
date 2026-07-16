@@ -15,7 +15,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Optional
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from security import get_client_ip
@@ -84,6 +84,9 @@ def _fallback_admin(email: str, user_id: str = "fallback-admin") -> dict:
         "email": email.lower().strip(),
         "name": "Ayurita Admin",
         "role": "admin",
+        # The fallback path only ever activates for the env-configured primary account (see
+        # admin_login), so it's always the owner, never a staff account.
+        "admin_role": "owner",
     }
 
 
@@ -114,6 +117,15 @@ async def get_current_admin(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+def require_owner(admin: dict = Depends(get_current_admin)) -> dict:
+    """Gate for owner-only admin routes (pricing, settings, staff management, analytics).
+    Admins created before sub-admin roles existed have no `admin_role` field at all - default
+    them to "owner" so existing single-admin installs keep full access unchanged."""
+    if admin.get("admin_role", "owner") != "owner":
+        raise HTTPException(status_code=403, detail="This action requires owner access")
+    return admin
 
 
 async def get_current_customer(request: Request) -> dict:

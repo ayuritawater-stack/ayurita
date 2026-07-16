@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Search, Package, CheckCircle2, Clock, Truck, ArrowRight, FileText, MessageCircle, Circle } from "lucide-react";
-import { api, formatINR, API } from "@/lib/api";
+import { Search, Package, CheckCircle2, Clock, Truck, ArrowRight, FileText, MessageCircle, Circle, Undo2 } from "lucide-react";
+import { api, formatINR, API, isCustomerLoggedIn } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -23,14 +23,35 @@ export default function OrderTracking() {
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showReturnForm, setShowReturnForm] = useState(false);
+  const [returnReason, setReturnReason] = useState("");
+  const [submittingReturn, setSubmittingReturn] = useState(false);
+  const [returnSubmitted, setReturnSubmitted] = useState(false);
 
   useEffect(() => {
     if (paramOrder) doSearch(paramOrder);
   }, [paramOrder]);
 
+  const submitReturn = async (e) => {
+    e.preventDefault();
+    setSubmittingReturn(true);
+    try {
+      await api.post(`/orders/${order.order_number}/return`, { reason: returnReason });
+      setReturnSubmitted(true);
+      setShowReturnForm(false);
+      toast.success("Return request submitted — we'll review it shortly.");
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to submit return request");
+    } finally {
+      setSubmittingReturn(false);
+    }
+  };
+
   const doSearch = async (num) => {
     setError("");
     setLoading(true);
+    setReturnSubmitted(false);
+    setShowReturnForm(false);
     try {
       const { data } = await api.get(`/orders/track/${num}`);
       setOrder(data);
@@ -207,7 +228,36 @@ export default function OrderTracking() {
                 >
                   <MessageCircle className="w-4 h-4" /> WhatsApp
                 </a>
+                {order.status === "delivered" && isCustomerLoggedIn() && !returnSubmitted && !order.return_status && (
+                  <button type="button" onClick={() => setShowReturnForm((s) => !s)} className="btn-secondary" data-testid="request-return-btn">
+                    <Undo2 className="w-4 h-4" /> Request Return / Refund
+                  </button>
+                )}
+                {(returnSubmitted || order.return_status) && (
+                  <span className="chip !bg-amber-50 !text-amber-600 capitalize">
+                    Return {order.return_status || "requested"}
+                  </span>
+                )}
               </div>
+
+              {showReturnForm && (
+                <form onSubmit={submitReturn} className="mt-4 pt-4 border-t border-slate-100 space-y-3">
+                  <textarea
+                    required
+                    placeholder="Tell us what went wrong (damaged, leaking, wrong item, etc.)"
+                    value={returnReason}
+                    onChange={(e) => setReturnReason(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm min-h-[80px]"
+                    data-testid="return-reason-input"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" className="btn-secondary" onClick={() => setShowReturnForm(false)}>Cancel</button>
+                    <button type="submit" className="btn-primary" disabled={submittingReturn} data-testid="submit-return-btn">
+                      {submittingReturn ? "Submitting…" : "Submit Request"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         )}

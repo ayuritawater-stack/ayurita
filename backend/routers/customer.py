@@ -1,10 +1,10 @@
 """Customer account router — signup, login, profile, password change, order history."""
 from datetime import timedelta
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Path
 
 import deps
 from deps import db, get_current_customer, hash_password, verify_password, create_access_token, new_id, now_utc, iso
-from models import CustomerSignupIn, CustomerLoginIn, CustomerProfileUpdate, CustomerPasswordChange
+from models import CustomerSignupIn, CustomerLoginIn, CustomerProfileUpdate, CustomerPasswordChange, AddressIn, CreditRequestIn
 
 router = APIRouter(prefix="/customer", tags=["customer"])
 
@@ -122,3 +122,106 @@ async def change_customer_password(body: CustomerPasswordChange, request: Reques
 async def customer_orders(customer: dict = Depends(get_current_customer)):
     orders = await db.orders.find({"customer_id": customer["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
     return orders
+
+
+# ---------------- Saved addresses ----------------
+# Stored as an embedded list on the customer document rather than a separate collection - a
+# handful of addresses per customer, always read/written as a whole list scoped to one owner,
+# so there's no query pattern that benefits from a dedicated collection.
+async def _get_addresses(customer_id: str) -> list:
+    c = await db.customers.find_one({"id": customer_id}, {"_id": 0, "addresses": 1})
+    return (c or {}).get("addresses", [])
+
+
+@router.get("/addresses")
+async def list_addresses(customer: dict = Depends(get_current_customer)):
+    return await _get_addresses(customer["id"])
+
+
+@router.post("/addresses")
+async def create_address(body: AddressIn, request: Request, customer: dict = Depends(get_current_customer)):
+    deps.check_authenticated_rate_limit(request, "update_customer_profile", customer["id"])
+    existing = await _get_addresses(customer["id"])
+    addr = body.model_dump()
+    addr["id"] = new_id()
+    addr["created_at"] = iso(now_utc())
+    # First saved address is always the default, regardless of what was requested, so a
+    # customer's very first save doesn't leave them with no default at all.
+    if addr["is_default"] or not existing:
+        for a in existing:
+            a["is_default"] = False
+        addr["is_default"] = True
+    existing.append(addr)
+    await db.customers.update_one({"id": customer["id"]}, {"$set": {"addresses": existing}})
+    return addr
+
+
+@router.put("/addresses/{address_id}")
+async def update_address(
+    body: AddressIn,
+    request: Request,
+    customer: dict = Depends(get_current_customer),
+    address_id: str = Path(min_length=1, max_length=64),
+):
+    deps.check_authenticated_rate_limit(request, "update_customer_profile", customer["id"])
+    existing = await _get_addresses(customer["id"])
+    if not any(a["id"] == address_id for a in existing):
+        raise HTTPException(status_code=404, detail="Address not found")
+    updated = body.model_dump()
+    updated["id"] = address_id
+    new_list = []
+    for a in existing:
+        if a["id"] == address_id:
+            updated["created_at"] = a.get("created_at")
+            new_list.append(updated)
+        else:
+            if updated["is_default"]:
+                a["is_default"] = False
+            new_list.append(a)
+    await db.customers.update_one({"id": customer["id"]}, {"$set": {"addresses": new_list}})
+    return updated
+
+
+@router.delete("/addresses/{address_id}")
+async def delete_address(
+    request: Request,
+    customer: dict = Depends(get_current_customer),
+    address_id: str = Path(min_length=1, max_length=64),
+):
+    deps.check_authenticated_rate_limit(request, "update_customer_profile", customer["id"])
+    existing = await _get_addresses(customer["id"])
+    new_list = [a for a in existing if a["id"] != address_id]
+    if len(new_list) == len(existing):
+        raise HTTPException(status_code=404, detail="Address not found")
+    if new_list and not any(a.get("is_default") for a in new_list):
+        new_list[0]["is_default"] = True
+    await db.customers.update_one({"id": customer["id"]}, {"$set": {"addresses": new_list}})
+    return {"ok": True}
+
+
+# ---------------- Self-service credit requests ----------------
+# A customer can ask for a credit line (or an increase); the actual limit is only ever set by
+# an owner (see routers/credit.py's require_owner-gated resolve endpoint) - this just lets them
+# ask instead of having to call in.
+@router.post("/credit-request")
+async def request_credit(body: CreditRequestIn, request: Request, customer: dict = Depends(get_current_customer)):
+    deps.check_authenticated_rate_limit(request, "credit_request", customer["id"])
+    if await db.credit_requests.find_one({"customer_id": customer["id"], "status": "pending"}):
+        raise HTTPException(status_code=400, detail="You already have a pending credit request")
+    doc = {
+        "id": new_id(),
+        "customer_id": customer["id"],
+        "business_name": customer.get("business_name", ""),
+        "requested_amount": body.requested_amount,
+        "note": body.note,
+        "status": "pending",
+        "created_at": iso(now_utc()),
+    }
+    await db.credit_requests.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/credit-request")
+async def my_credit_requests(customer: dict = Depends(get_current_customer)):
+    return await db.credit_requests.find({"customer_id": customer["id"]}, {"_id": 0}).sort("created_at", -1).to_list(20)

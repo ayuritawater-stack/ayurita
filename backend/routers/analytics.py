@@ -2,13 +2,13 @@
 from datetime import timedelta, datetime, timezone
 from collections import defaultdict
 from fastapi import APIRouter, Depends
-from deps import db, get_current_admin
+from deps import db, require_owner, now_utc, iso
 
 router = APIRouter(tags=["analytics"])
 
 
 @router.get("/admin/analytics/summary")
-async def analytics_summary(admin: dict = Depends(get_current_admin)):
+async def analytics_summary(admin: dict = Depends(require_owner)):
     try:
         orders = await db.orders.find({}, {"_id": 0}).to_list(5000)
         total_revenue = sum(o.get("grand_total", 0) for o in orders if o.get("status") != "cancelled")
@@ -20,6 +20,25 @@ async def analytics_summary(admin: dict = Depends(get_current_admin)):
         bulk_count = await db.bulk_inquiries.count_documents({})
         bulk_new = await db.bulk_inquiries.count_documents({"status": "new"})
         contact_new = await db.contact_messages.count_documents({"status": "new"})
+
+        settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0, "low_stock_threshold": 1})
+        low_stock_threshold = (settings or {}).get("low_stock_threshold", 10)
+        low_stock_products = await db.products.find(
+            {"is_active": True, "stock": {"$lte": low_stock_threshold}},
+            {"_id": 0, "id": 1, "name": 1, "slug": 1, "stock": 1},
+        ).sort("stock", 1).to_list(50)
+
+        credit_agg = await db.customers.aggregate([
+            {"$match": {"credit_balance": {"$gt": 0}}},
+            {"$group": {"_id": None, "total": {"$sum": "$credit_balance"}}},
+        ]).to_list(1)
+        total_credit_outstanding = round(credit_agg[0]["total"], 2) if credit_agg else 0.0
+        today_iso = iso(now_utc())
+        overdue_credit_count = await db.orders.count_documents({
+            "payment_method": "credit",
+            "credit_status": {"$in": ["unpaid", "partial"]},
+            "credit_due_date": {"$lt": today_iso},
+        })
 
         daily = defaultdict(float)
         daily_orders = defaultdict(int)
@@ -58,6 +77,10 @@ async def analytics_summary(admin: dict = Depends(get_current_admin)):
             "new_contact_messages": contact_new,
             "revenue_series": series,
             "top_products": top_products,
+            "low_stock_products": low_stock_products,
+            "low_stock_count": len(low_stock_products),
+            "total_credit_outstanding": total_credit_outstanding,
+            "overdue_credit_count": overdue_credit_count,
         }
     except Exception as e:
         # Return empty/default data if database is unavailable
@@ -80,4 +103,8 @@ async def analytics_summary(admin: dict = Depends(get_current_admin)):
             "new_contact_messages": 0,
             "revenue_series": series,
             "top_products": [],
+            "low_stock_products": [],
+            "low_stock_count": 0,
+            "total_credit_outstanding": 0.0,
+            "overdue_credit_count": 0,
         }

@@ -88,7 +88,9 @@ export default function AdminProfile() {
               </div>
               <div className="min-w-0">
                 <div className="font-semibold text-slate-900 truncate">{user?.name || admin?.name}</div>
-                <div className="text-xs text-slate-500 uppercase tracking-wide">{user?.role || "admin"}</div>
+                <div className="text-xs text-slate-500 uppercase tracking-wide">
+                  {(user?.admin_role || admin?.admin_role || "owner") === "owner" ? "Owner" : "Staff"}
+                </div>
               </div>
             </div>
 

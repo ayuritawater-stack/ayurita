@@ -87,7 +87,7 @@ class OrderIn(BaseModel):
     items: List[CartItemIn] = Field(min_length=1, max_length=200)
     guest: GuestInfo
     coupon_code: Optional[str] = Field(None, min_length=1, max_length=50, pattern=r"^[A-Za-z0-9_-]+$")
-    payment_method: Literal["cod", "online"] = "cod"
+    payment_method: Literal["cod", "online", "credit"] = "cod"
 
 
 class BulkInquiryIn(BaseModel):
@@ -160,6 +160,74 @@ class CustomerProfileUpdate(BaseModel):
     gst_number: Optional[str] = Field(None, max_length=20)
 
 
+class StaffCreateIn(BaseModel):
+    model_config = _STRICT
+    email: EmailStr
+    password: str = Field(min_length=6, max_length=100)
+    name: str = Field(min_length=1, max_length=200)
+    admin_role: Literal["owner", "staff"] = "staff"
+
+
+class StaffRoleUpdate(BaseModel):
+    model_config = _STRICT
+    admin_role: Literal["owner", "staff"]
+
+
+class ReviewIn(BaseModel):
+    model_config = _STRICT
+    rating: int = Field(ge=1, le=5)
+    comment: Optional[str] = Field(None, max_length=2000)
+
+
+class ReviewStatusUpdate(BaseModel):
+    model_config = _STRICT
+    status: Literal["pending", "approved", "rejected"]
+
+
+class CreditLimitUpdate(BaseModel):
+    model_config = _STRICT
+    credit_limit: float = Field(ge=0, le=10_000_000)
+
+
+class RecordPaymentIn(BaseModel):
+    model_config = _STRICT
+    amount: float = Field(gt=0, le=10_000_000)
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class CreditRequestIn(BaseModel):
+    model_config = _STRICT
+    requested_amount: float = Field(gt=0, le=10_000_000)
+    note: Optional[str] = Field(None, max_length=1000)
+
+
+class CreditRequestResolve(BaseModel):
+    model_config = _STRICT
+    status: Literal["approved", "rejected"]
+    approved_limit: Optional[float] = Field(None, ge=0, le=10_000_000)
+
+
+class ReturnRequestIn(BaseModel):
+    model_config = _STRICT
+    reason: str = Field(min_length=1, max_length=2000)
+
+
+class ReturnStatusUpdate(BaseModel):
+    model_config = _STRICT
+    status: Literal["approved", "rejected", "refunded"]
+    resolution_note: Optional[str] = Field(None, max_length=2000)
+    refund_amount: Optional[float] = Field(None, ge=0, le=10_000_000)
+
+
+class AddressIn(BaseModel):
+    model_config = _STRICT
+    label: str = Field(min_length=1, max_length=50)
+    address: str = Field(min_length=1, max_length=500)
+    city: str = Field(min_length=1, max_length=100)
+    gst_number: Optional[str] = Field(None, max_length=20)
+    is_default: bool = False
+
+
 class CustomerPasswordChange(BaseModel):
     model_config = _STRICT
     current_password: str = Field(min_length=1, max_length=200)
@@ -194,3 +262,8 @@ class SettingsIn(BaseModel):
     tax_rate: float = Field(0.0, ge=0, le=100)
     shipping_flat: float = Field(0.0, ge=0, le=100_000)
     free_shipping_above: float = Field(0.0, ge=0, le=10_000_000)
+    low_stock_threshold: int = Field(10, ge=0, le=100_000)
+    credit_due_days: int = Field(30, ge=1, le=365)
+    large_order_threshold: float = Field(20000.0, ge=0, le=100_000_000)
+    return_window_days: int = Field(2, ge=0, le=90)
+    credit_reminder_lead_days: int = Field(3, ge=0, le=30)

@@ -27,6 +27,7 @@ export function SettingsProvider({ children }) {
           phoneDisplay: formatPhoneDisplay(data.phone),
           whatsapp: data.whatsapp || DEFAULT_BUSINESS.whatsapp,
           email: data.email || DEFAULT_BUSINESS.email,
+          gstin: data.gstin || "",
           hours: data.business_hours || DEFAULT_BUSINESS.hours,
           deliveryArea: DEFAULT_BUSINESS.deliveryArea,
           shippingFlat: Number.isFinite(data.shipping_flat) ? data.shipping_flat : 50,

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CouponDropdown from "@/components/CouponDropdown";
 
 const loadRazorpayScript = () =>
@@ -30,6 +31,9 @@ export default function Checkout() {
   const [payment, setPayment] = useState("cod");
   const [coupon, setCoupon] = useState("");
   const [couponData, setCouponData] = useState(null);
+  const [addresses, setAddresses] = useState([]);
+  const [selectedAddressId, setSelectedAddressId] = useState("");
+  const [credit, setCredit] = useState({ credit_limit: 0, credit_balance: 0 });
   const [form, setForm] = useState({
     business_name: "",
     contact_person: "",
@@ -57,8 +61,25 @@ export default function Checkout() {
         city: data.city || f.city,
         gst_number: data.gst_number || f.gst_number,
       }));
+      setCredit({ credit_limit: data.credit_limit || 0, credit_balance: data.credit_balance || 0 });
+    }).catch(() => {});
+    // Saved addresses (Account page) take precedence over the single legacy profile address
+    // above, if any exist - the default one is pre-selected but still fully editable per order.
+    api.get("/customer/addresses").then(({ data }) => {
+      setAddresses(data);
+      const def = data.find((a) => a.is_default) || data[0];
+      if (def) {
+        setSelectedAddressId(def.id);
+        setForm((f) => ({ ...f, address: def.address, city: def.city, gst_number: def.gst_number || f.gst_number }));
+      }
     }).catch(() => {});
   }, []);
+
+  const selectAddress = (id) => {
+    setSelectedAddressId(id);
+    const a = addresses.find((x) => x.id === id);
+    if (a) setForm((f) => ({ ...f, address: a.address, city: a.city, gst_number: a.gst_number || f.gst_number }));
+  };
 
   const applyCoupon = async () => {
     if (!coupon) return;
@@ -76,6 +97,8 @@ export default function Checkout() {
   const gst = (subtotal - discount) * 0.18;
   const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
   const total = subtotal - discount + gst + shipping;
+  const availableCredit = credit.credit_limit - credit.credit_balance;
+  const creditCoversOrder = availableCredit >= total;
 
   const placeOrder = async (e) => {
     e.preventDefault();
@@ -188,6 +211,21 @@ export default function Checkout() {
                   <Label>City *</Label>
                   <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} className="mt-1.5 rounded-xl" />
                 </div>
+                {addresses.length > 0 && (
+                  <div className="md:col-span-2">
+                    <Label>Saved Address</Label>
+                    <Select value={selectedAddressId} onValueChange={selectAddress}>
+                      <SelectTrigger className="mt-1.5 rounded-xl" data-testid="checkout-address-select">
+                        <SelectValue placeholder="Choose a saved address" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {addresses.map((a) => (
+                          <SelectItem key={a.id} value={a.id}>{a.label} — {a.city}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 <div className="md:col-span-2">
                   <Label>Delivery Address *</Label>
                   <Textarea required data-testid="checkout-address" value={form.address} onChange={(e) => set("address", e.target.value)} className="mt-1.5 rounded-xl min-h-[80px]" />
@@ -220,6 +258,20 @@ export default function Checkout() {
                     <div className="text-xs text-slate-600 mt-0.5">Pay securely with UPI, cards, net banking or wallets via Razorpay.</div>
                   </div>
                 </label>
+                {credit.credit_limit > 0 && (
+                  <label className={`flex items-start gap-3 p-4 rounded-xl border transition ${!creditCoversOrder ? "opacity-50 cursor-not-allowed" : "cursor-pointer"} ${payment === "credit" ? "border-brand-primary bg-sky-50" : "border-slate-200"}`}>
+                    <RadioGroupItem value="credit" id="pm-credit" data-testid="payment-credit" className="mt-0.5" disabled={!creditCoversOrder} />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 font-semibold text-slate-900">
+                        <Wallet className="w-4 h-4 text-brand-primary" /> Bill to Credit Account
+                      </div>
+                      <div className="text-xs text-slate-600 mt-0.5">
+                        Available credit: {formatINR(availableCredit)} of {formatINR(credit.credit_limit)}.
+                        {!creditCoversOrder && " This order exceeds your available credit."}
+                      </div>
+                    </div>
+                  </label>
+                )}
               </RadioGroup>
             </div>
           </div>

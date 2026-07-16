@@ -20,6 +20,11 @@ const EMPTY = {
   tax_rate: 0,
   shipping_flat: 0,
   free_shipping_above: 0,
+  low_stock_threshold: 10,
+  credit_due_days: 30,
+  large_order_threshold: 20000,
+  return_window_days: 2,
+  credit_reminder_lead_days: 3,
 };
 
 const errorMessage = (err, fallback) => {
@@ -63,6 +68,11 @@ export default function AdminSettings() {
         tax_rate: Number(settings.tax_rate || 0),
         shipping_flat: Number(settings.shipping_flat || 0),
         free_shipping_above: Number(settings.free_shipping_above || 0),
+        low_stock_threshold: Number(settings.low_stock_threshold || 0),
+        credit_due_days: Number(settings.credit_due_days || 30),
+        large_order_threshold: Number(settings.large_order_threshold || 0),
+        return_window_days: Number(settings.return_window_days || 0),
+        credit_reminder_lead_days: Number(settings.credit_reminder_lead_days || 0),
       };
       await api.put("/admin/settings", payload);
       toast.success("Settings saved");
@@ -155,6 +165,43 @@ export default function AdminSettings() {
               <div>
                 <Label>Free Shipping Above</Label>
                 <Input type="number" value={settings.free_shipping_above} onChange={(e) => setField("free_shipping_above", e.target.value)} className="mt-1.5 rounded-xl" />
+              </div>
+            </div>
+          </section>
+
+          <section className="card-premium p-6">
+            <div className="font-semibold text-slate-900 mb-5">Inventory</div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label>Low Stock Threshold</Label>
+                <Input type="number" value={settings.low_stock_threshold} onChange={(e) => setField("low_stock_threshold", e.target.value)} className="mt-1.5 rounded-xl" />
+                <p className="text-xs text-slate-500 mt-1">Products at or below this stock count are flagged on the dashboard.</p>
+              </div>
+            </div>
+          </section>
+
+          <section className="card-premium p-6">
+            <div className="font-semibold text-slate-900 mb-5">Wholesale Credit & Order Review</div>
+            <div className="grid gap-4 md:grid-cols-3">
+              <div>
+                <Label>Credit Due (Days)</Label>
+                <Input type="number" value={settings.credit_due_days} onChange={(e) => setField("credit_due_days", e.target.value)} className="mt-1.5 rounded-xl" />
+                <p className="text-xs text-slate-500 mt-1">How many days a customer has to pay off a "Bill to Credit" order.</p>
+              </div>
+              <div>
+                <Label>Large Order Threshold (₹)</Label>
+                <Input type="number" value={settings.large_order_threshold} onChange={(e) => setField("large_order_threshold", e.target.value)} className="mt-1.5 rounded-xl" />
+                <p className="text-xs text-slate-500 mt-1">Orders at or above this value are flagged "Needs Review" in the order list.</p>
+              </div>
+              <div>
+                <Label>Return Window (Days)</Label>
+                <Input type="number" value={settings.return_window_days} onChange={(e) => setField("return_window_days", e.target.value)} className="mt-1.5 rounded-xl" />
+                <p className="text-xs text-slate-500 mt-1">How many days after delivery a customer can request a return.</p>
+              </div>
+              <div>
+                <Label>Reminder Lead Time (Days)</Label>
+                <Input type="number" value={settings.credit_reminder_lead_days} onChange={(e) => setField("credit_reminder_lead_days", e.target.value)} className="mt-1.5 rounded-xl" />
+                <p className="text-xs text-slate-500 mt-1">Start sending WhatsApp payment reminders this many days before a credit order's due date.</p>
               </div>
             </div>
           </section>

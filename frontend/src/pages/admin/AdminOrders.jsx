@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown } from "lucide-react";
-import { api, formatINR, API } from "@/lib/api";
+import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle } from "lucide-react";
+import { api, formatINR } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUSES = ["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"];
@@ -30,6 +30,22 @@ export default function AdminOrders() {
     setLoading(false);
   }, [filter]);
   useEffect(() => { load(); }, [load]);
+
+  const downloadInvoice = async (id, orderNumber) => {
+    try {
+      const { data } = await api.get(`/admin/orders/${id}/invoice.pdf`, { responseType: "blob" });
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Ayurita-Invoice-${orderNumber}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      toast.error("Failed to download invoice");
+    }
+  };
 
   const changeStatus = async (id, status) => {
     try {
@@ -100,7 +116,12 @@ export default function AdminOrders() {
               <tr><td colSpan="7" className="p-8 text-center text-slate-500">No orders found.</td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} className="hover:bg-slate-50" data-testid={`order-row-${o.order_number}`}>
-                <td className="px-6 py-3 font-mono text-xs text-slate-900 font-semibold">{o.order_number}</td>
+                <td className="px-6 py-3 font-mono text-xs text-slate-900 font-semibold">
+                  <div className="flex items-center gap-1.5">
+                    {o.order_number}
+                    {o.flagged_for_review && <AlertTriangle className="w-3.5 h-3.5 text-amber-500" data-testid={`flag-${o.order_number}`} />}
+                  </div>
+                </td>
                 <td className="px-6 py-3">
                   <div className="font-semibold text-slate-900">{o.guest?.business_name}</div>
                   <div className="text-xs text-slate-500">{o.guest?.contact_person}</div>
@@ -132,6 +153,12 @@ export default function AdminOrders() {
               <div>
                 <div className="text-xs text-slate-500">Order</div>
                 <div className="font-heading font-bold">{detail.order_number}</div>
+                {detail.flagged_for_review && (
+                  <div className="flex items-center gap-1 text-xs text-amber-600 font-semibold mt-1" data-testid="order-flag-banner">
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    Needs review — {detail.flag_reasons?.map((r) => (r === "large_order" ? "large order" : "first credit order")).join(", ")}
+                  </div>
+                )}
               </div>
               <button onClick={() => setDetail(null)} className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center">
                 <X className="w-4 h-4" />
@@ -199,15 +226,13 @@ export default function AdminOrders() {
               </div>
 
               <div className="grid grid-cols-2 gap-2">
-                <a
-                  href={`${API}/admin/orders/${detail.id}/invoice.pdf?token=${localStorage.getItem("ayurita_token")}`}
-                  target="_blank"
-                  rel="noreferrer"
+                <button
+                  onClick={() => downloadInvoice(detail.id, detail.order_number)}
                   className="btn-primary col-span-2"
                   data-testid="download-invoice-pdf"
                 >
                   <FileDown className="w-4 h-4" /> Download GST Invoice (PDF)
-                </a>
+                </button>
                 <button onClick={() => window.print()} className="btn-secondary col-span-2"><Package className="w-4 h-4" /> Print / Save Invoice</button>
               </div>
             </div>

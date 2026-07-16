@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid, BarChart, Bar } from "recharts";
-import { IndianRupee, ShoppingBag, Package, MessagesSquare, ArrowRight, TrendingUp, Clock, CheckCircle2 } from "lucide-react";
+import { IndianRupee, ShoppingBag, Package, MessagesSquare, ArrowRight, TrendingUp, Clock, CheckCircle2, AlertTriangle, Wallet } from "lucide-react";
 import { api, formatINR } from "@/lib/api";
 
 const StatCard = ({ icon: Icon, label, value, sub, tint = "sky", testid }) => {
@@ -164,6 +164,51 @@ export default function AdminDashboard() {
                 <div className="text-xs text-slate-500">New contact messages</div>
               </div>
             </div>
+          </div>
+
+          <div className="card-premium p-6" data-testid="credit-widget">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 font-heading font-bold text-slate-900">
+                <Wallet className="w-4 h-4 text-brand-primary" />
+                Credit Outstanding
+              </div>
+              <Link to="/admin/customers" className="text-xs font-semibold text-brand-primary flex items-center gap-1 hover:underline">
+                Manage <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            <div className="text-2xl font-heading font-bold text-slate-900">{formatINR(data.total_credit_outstanding)}</div>
+            <div className={`text-xs mt-1 ${data.overdue_credit_count > 0 ? "text-rose-500" : "text-slate-500"}`}>
+              {data.overdue_credit_count > 0 ? `${data.overdue_credit_count} order(s) overdue` : "No overdue credit orders"}
+            </div>
+          </div>
+
+          <div className="card-premium p-6" data-testid="low-stock-widget">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 font-heading font-bold text-slate-900">
+                <AlertTriangle className="w-4 h-4 text-amber-500" />
+                Low Stock
+              </div>
+              <Link to="/admin/products" className="text-xs font-semibold text-brand-primary flex items-center gap-1 hover:underline">
+                Manage <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            {!data.low_stock_count ? (
+              <div className="text-sm text-slate-500">All products are well stocked.</div>
+            ) : (
+              <div className="space-y-2">
+                {data.low_stock_products.slice(0, 5).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-sm">
+                    <span className="truncate text-slate-700">{p.name}</span>
+                    <span className={`shrink-0 font-semibold ${p.stock === 0 ? "text-rose-500" : "text-amber-600"}`}>
+                      {p.stock === 0 ? "Out of stock" : `${p.stock} left`}
+                    </span>
+                  </div>
+                ))}
+                {data.low_stock_count > 5 && (
+                  <div className="text-xs text-slate-400 pt-1">+{data.low_stock_count - 5} more</div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

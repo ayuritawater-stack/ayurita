@@ -80,6 +80,8 @@ export default function Footer() {
         <div className="container-x py-6 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-slate-500">
           <div>© {new Date().getFullYear()} Ayurita Packaged Drinking Water. All rights reserved.</div>
           <div className="flex gap-6">
+            <Link to="/terms" className="hover:text-white transition">Terms &amp; Conditions</Link>
+            <Link to="/privacy" className="hover:text-white transition">Privacy Policy</Link>
             <span>Made with care in Begusarai, Bihar</span>
           </div>
         </div>

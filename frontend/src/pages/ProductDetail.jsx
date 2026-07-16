@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart } from "lucide-react";
-import { api, formatINR } from "@/lib/api";
+import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart, Star } from "lucide-react";
+import { api, formatINR, isCustomerLoggedIn } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
@@ -19,6 +19,9 @@ export default function ProductDetail() {
   const [qty, setQty] = useState(1);
   const [activeImg, setActiveImg] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [reviews, setReviews] = useState([]);
+  const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
+  const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -29,10 +32,26 @@ export default function ProductDetail() {
         setActiveImg(0);
         const rel = await api.get("/products", { params: { category: r.data.category_id, limit: 4 } });
         setRelated(rel.data.filter((p) => p.id !== r.data.id).slice(0, 3));
+        const rev = await api.get(`/products/${r.data.id}/reviews`);
+        setReviews(rev.data);
       })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
   }, [slug]);
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    setSubmittingReview(true);
+    try {
+      await api.post(`/products/${product.id}/reviews`, reviewForm);
+      toast.success("Thanks! Your review is submitted and will appear once approved.");
+      setReviewForm({ rating: 5, comment: "" });
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to submit review");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   if (loading) {
     return <div className="container-x py-24 text-center text-slate-500">Loading…</div>;
@@ -98,6 +117,17 @@ export default function ProductDetail() {
           <div>
             <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold">{product.category_name}</div>
             <h1 className="font-heading font-bold text-3xl md:text-4xl tracking-tight text-slate-900 mt-2" data-testid="product-title">{product.name}</h1>
+            {product.review_count > 0 && (
+              <div className="flex items-center gap-1.5 mt-2" data-testid="product-rating">
+                <div className="flex items-center">
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <Star key={n} className={`w-4 h-4 ${n <= Math.round(product.rating) ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                  ))}
+                </div>
+                <span className="text-sm font-semibold text-slate-700">{product.rating?.toFixed(1)}</span>
+                <span className="text-xs text-slate-500">({product.review_count} review{product.review_count === 1 ? "" : "s"})</span>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 mt-4">
               <span className="chip">{product.size}</span>
               {product.featured && <span className="chip !bg-emerald-50 !text-brand-emerald">Featured</span>}
@@ -208,6 +238,66 @@ export default function ProductDetail() {
               ))}
             </div>
           </div>
+        </div>
+
+        {/* Reviews */}
+        <div className="mt-24 max-w-3xl">
+          <h2 className="h-section mb-8">Customer Reviews</h2>
+
+          {isCustomerLoggedIn() && (
+            <form onSubmit={submitReview} className="card-premium p-5 mb-6 space-y-3">
+              <div className="text-sm font-semibold text-slate-900">Write a review</div>
+              <div className="flex items-center gap-1">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => setReviewForm((f) => ({ ...f, rating: n }))}
+                    aria-label={`${n} star${n === 1 ? "" : "s"}`}
+                    data-testid={`review-star-${n}`}
+                  >
+                    <Star className={`w-6 h-6 ${n <= reviewForm.rating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                  </button>
+                ))}
+              </div>
+              <textarea
+                placeholder="Share your experience with this product (optional)"
+                value={reviewForm.comment}
+                onChange={(e) => setReviewForm((f) => ({ ...f, comment: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 p-3 text-sm min-h-[80px]"
+                data-testid="review-comment-input"
+              />
+              <div className="flex justify-end">
+                <button type="submit" className="btn-primary" disabled={submittingReview} data-testid="submit-review-btn">
+                  {submittingReview ? "Submitting…" : "Submit Review"}
+                </button>
+              </div>
+              <p className="text-xs text-slate-500">Only customers with a delivered order for this product can review it. Reviews are checked before appearing publicly.</p>
+            </form>
+          )}
+
+          {reviews.length === 0 ? (
+            <p className="text-sm text-slate-500">No reviews yet.</p>
+          ) : (
+            <div className="space-y-4">
+              {reviews.map((r) => (
+                <div key={r.id} className="border-b border-slate-100 pb-4" data-testid={`review-${r.id}`}>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center">
+                        {[1, 2, 3, 4, 5].map((n) => (
+                          <Star key={n} className={`w-3.5 h-3.5 ${n <= r.rating ? "fill-amber-400 text-amber-400" : "text-slate-300"}`} />
+                        ))}
+                      </div>
+                      <span className="text-sm font-semibold text-slate-900">{r.business_name}</span>
+                    </div>
+                    <span className="text-xs text-slate-400">{r.created_at?.slice(0, 10)}</span>
+                  </div>
+                  {r.comment && <p className="text-sm text-slate-600 mt-2">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Related */}

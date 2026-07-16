@@ -1,5 +1,6 @@
 """Public product catalogue PDF."""
 import io
+from html import escape as _esc
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from reportlab.lib.pagesizes import A4
@@ -69,7 +70,7 @@ async def download_catalogue():
         rows = [head]
         for p in cat_products:
             rows.append([
-                Paragraph(f"<b>{p.get('name','')}</b><br/><font size='7.5' color='#6B7280'>{(p.get('description') or '')[:80]}</font>", normal),
+                Paragraph(f"<b>{_esc(p.get('name',''))}</b><br/><font size='7.5' color='#6B7280'>{_esc((p.get('description') or '')[:80])}</font>", normal),
                 p.get("size", ""),
                 str(p.get("moq", 1)),
                 _rupees(p.get("price", 0)),

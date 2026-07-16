@@ -1,7 +1,7 @@
 """Categories router."""
 from fastapi import APIRouter, HTTPException, Depends, Request, Path
 import deps
-from deps import db, get_current_admin, new_id, now_utc, iso
+from deps import db, require_owner, new_id, now_utc, iso
 from models import CategoryIn
 
 router = APIRouter(tags=["categories"])
@@ -14,7 +14,7 @@ async def list_categories():
 
 
 @router.post("/categories")
-async def create_category(body: CategoryIn, request: Request, admin: dict = Depends(get_current_admin)):
+async def create_category(body: CategoryIn, request: Request, admin: dict = Depends(require_owner)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     if await db.categories.find_one({"slug": body.slug}):
         raise HTTPException(status_code=400, detail="Slug already exists")
@@ -30,7 +30,7 @@ async def create_category(body: CategoryIn, request: Request, admin: dict = Depe
 async def update_category(
     body: CategoryIn,
     request: Request,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_owner),
     cat_id: str = Path(min_length=1, max_length=64),
 ):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
@@ -43,7 +43,7 @@ async def update_category(
 @router.delete("/categories/{cat_id}")
 async def delete_category(
     request: Request,
-    admin: dict = Depends(get_current_admin),
+    admin: dict = Depends(require_owner),
     cat_id: str = Path(min_length=1, max_length=64),
 ):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])

@@ -2,7 +2,7 @@
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Request, Path, Query
 import deps
-from deps import db, get_current_admin, new_id, now_utc, iso
+from deps import db, require_owner, new_id, now_utc, iso
 from models import CouponIn
 
 router = APIRouter(tags=["coupons"])
@@ -14,7 +14,7 @@ async def list_coupons():
 
 
 @router.post("/coupons")
-async def create_coupon(body: CouponIn, request: Request, admin: dict = Depends(get_current_admin)):
+async def create_coupon(body: CouponIn, request: Request, admin: dict = Depends(require_owner)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     code = body.code.upper().strip()
     if await db.coupons.find_one({"code": code}):
@@ -29,7 +29,7 @@ async def create_coupon(body: CouponIn, request: Request, admin: dict = Depends(
 
 
 @router.put("/coupons/{coupon_id}")
-async def update_coupon(body: CouponIn, request: Request, admin: dict = Depends(get_current_admin), coupon_id: str = Path(min_length=1, max_length=64)):
+async def update_coupon(body: CouponIn, request: Request, admin: dict = Depends(require_owner), coupon_id: str = Path(min_length=1, max_length=64)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     upd = body.model_dump()
     upd["code"] = upd["code"].upper().strip()
@@ -40,7 +40,7 @@ async def update_coupon(body: CouponIn, request: Request, admin: dict = Depends(
 
 
 @router.delete("/coupons/{coupon_id}")
-async def delete_coupon(request: Request, admin: dict = Depends(get_current_admin), coupon_id: str = Path(min_length=1, max_length=64)):
+async def delete_coupon(request: Request, admin: dict = Depends(require_owner), coupon_id: str = Path(min_length=1, max_length=64)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     await db.coupons.delete_one({"id": coupon_id})
     return {"ok": True}

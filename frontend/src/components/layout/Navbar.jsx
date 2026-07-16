@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, ShoppingCart, Phone, Droplets, X, Heart, User } from "lucide-react";
+import { Menu, ShoppingCart, Phone, Droplets, X, Heart, User, Scale } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
+import { useCompare } from "@/lib/compare";
 import { isCustomerLoggedIn } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 
@@ -20,6 +21,7 @@ export default function Navbar() {
   const BUSINESS = useSettings();
   const { count } = useCart();
   const { count: wlCount } = useWishlist();
+  const { count: compareCount } = useCompare();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [customerIn, setCustomerIn] = useState(isCustomerLoggedIn());
@@ -99,6 +101,19 @@ export default function Navbar() {
             {wlCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {wlCount}
+              </span>
+            )}
+          </Link>
+          <Link
+            to="/compare"
+            className="relative w-10 h-10 rounded-full bg-slate-50 hover:bg-slate-100 hidden sm:flex items-center justify-center transition"
+            data-testid="nav-compare"
+            aria-label="Compare"
+          >
+            <Scale className="w-5 h-5 text-slate-700" strokeWidth={1.8} />
+            {compareCount > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-brand-primary text-white text-[10px] font-bold flex items-center justify-center">
+                {compareCount}
               </span>
             )}
           </Link>

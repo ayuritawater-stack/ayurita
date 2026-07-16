@@ -1,8 +1,10 @@
 """Settings router."""
 from fastapi import APIRouter, Depends, Request
 import deps
-from deps import db, get_current_admin, now_utc, iso
+from deps import db, require_owner, now_utc, iso
 from models import SettingsIn
+from security import get_client_ip
+from audit import record_audit
 
 router = APIRouter(tags=["settings"])
 
@@ -22,6 +24,11 @@ DEFAULT_SETTINGS = {
     "tax_rate": 18.0,
     "shipping_flat": 50.0,
     "free_shipping_above": 500.0,
+    "low_stock_threshold": 10,
+    "credit_due_days": 30,
+    "large_order_threshold": 20000.0,
+    "return_window_days": 2,
+    "credit_reminder_lead_days": 3,
     "created_at": None,
     "updated_at": None,
 }
@@ -49,14 +56,15 @@ async def get_public_settings():
 
 
 @router.get("/admin/settings")
-async def get_settings(admin: dict = Depends(get_current_admin)):
+async def get_settings(admin: dict = Depends(require_owner)):
     return await _get_or_create_settings()
 
 @router.put("/admin/settings")
-async def update_settings(body: SettingsIn, request: Request, admin: dict = Depends(get_current_admin)):
+async def update_settings(body: SettingsIn, request: Request, admin: dict = Depends(require_owner)):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
     doc = body.model_dump()
     doc["id"] = SETTINGS_ID
     doc["updated_at"] = iso(now_utc())
     await db.settings.replace_one({"id": SETTINGS_ID}, doc, upsert=True)
+    await record_audit(db, admin["email"], get_client_ip(request), "update_settings", SETTINGS_ID)
     return doc

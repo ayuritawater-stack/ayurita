@@ -38,6 +38,7 @@ async def admin_login(request: Request, body: LoginRequest):
                     "email": email,
                     "name": "Ayurita Admin",
                     "role": "admin",
+                    "admin_role": "owner",
                 },
             }
         deps.record_auth_failure(request, "admin_login", email)
@@ -54,6 +55,7 @@ async def admin_login(request: Request, body: LoginRequest):
                     "email": email,
                     "name": "Ayurita Admin",
                     "role": "admin",
+                    "admin_role": "owner",
                 },
             }
         deps.record_auth_failure(request, "admin_login", email)
@@ -69,6 +71,7 @@ async def admin_login(request: Request, body: LoginRequest):
             "email": admin["email"],
             "name": admin.get("name", "Admin"),
             "role": "admin",
+            "admin_role": admin.get("admin_role", "owner"),
         },
     }
 

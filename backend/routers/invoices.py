@@ -1,6 +1,7 @@
 """GST invoice PDF for admin."""
 import io
 from datetime import datetime
+from html import escape as _esc
 from fastapi import APIRouter, HTTPException, Query, Request, Path
 from fastapi.responses import StreamingResponse
 from reportlab.lib.pagesizes import A4
@@ -86,21 +87,26 @@ def _build_invoice_pdf(order: dict, BUSINESS: dict) -> io.BytesIO:
     story.append(Spacer(1, 4 * mm))
 
     # Business + invoice meta
+    # Every value below can end up inside ReportLab's Paragraph markup, which parses an XML-like
+    # mini-language (<font>, <br/>, <a href>, <img src>, ...). Guest-supplied fields come straight
+    # from the public checkout form with no character restriction beyond length, so they must be
+    # escaped before interpolation - otherwise a customer could inject markup (e.g. an <img src=
+    # "http://..."/> tag, fetched server-side while building the PDF) into their own order.
     left = f"""<font color='#6B7280' size='8'>FROM</font><br/>
-<b>{BUSINESS['name']}</b><br/>
-{BUSINESS['address']}<br/>
-Phone: {BUSINESS['phone']}<br/>
-Email: {BUSINESS['email']}<br/>
-GSTIN: {BUSINESS['gstin']}"""
+<b>{_esc(BUSINESS['name'])}</b><br/>
+{_esc(BUSINESS['address'])}<br/>
+Phone: {_esc(BUSINESS['phone'])}<br/>
+Email: {_esc(BUSINESS['email'])}<br/>
+GSTIN: {_esc(BUSINESS['gstin'])}"""
 
     guest = order.get("guest", {})
     right = f"""<font color='#6B7280' size='8'>BILL TO</font><br/>
-<b>{guest.get('business_name', '')}</b><br/>
-{guest.get('contact_person', '')}<br/>
-{guest.get('address', '')}, {guest.get('city', '')}<br/>
-Phone: {guest.get('phone', '')}<br/>
-Email: {guest.get('email', '')}<br/>
-{('GSTIN: ' + guest['gst_number']) if guest.get('gst_number') else ''}"""
+<b>{_esc(guest.get('business_name', ''))}</b><br/>
+{_esc(guest.get('contact_person', ''))}<br/>
+{_esc(guest.get('address', ''))}, {_esc(guest.get('city', ''))}<br/>
+Phone: {_esc(guest.get('phone', ''))}<br/>
+Email: {_esc(guest.get('email', ''))}<br/>
+{('GSTIN: ' + _esc(guest['gst_number'])) if guest.get('gst_number') else ''}"""
 
     meta_lines = [
         ("Invoice #", order["order_number"]),
@@ -187,12 +193,12 @@ Email: {guest.get('email', '')}<br/>
 
     # Notes / footer
     if order.get("guest", {}).get("notes"):
-        story.append(Paragraph("<b>Order Notes:</b> " + str(order["guest"]["notes"]), normal))
+        story.append(Paragraph("<b>Order Notes:</b> " + _esc(str(order["guest"]["notes"])), normal))
         story.append(Spacer(1, 3 * mm))
 
     story.append(Paragraph(
         "This is a system-generated GST tax invoice. Goods once dispatched are subject to Ayurita's supply terms. "
-        "For any queries regarding this invoice, please contact " + BUSINESS["email"] + " or call " + BUSINESS["phone"] + ".",
+        "For any queries regarding this invoice, please contact " + _esc(BUSINESS["email"]) + " or call " + _esc(BUSINESS["phone"]) + ".",
         small,
     ))
     story.append(Spacer(1, 6 * mm))
