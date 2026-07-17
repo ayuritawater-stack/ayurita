@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { User, MapPin, Mail, LockKeyhole, LogOut, Package, RotateCcw, Star, Pencil, Trash2, Plus, Wallet } from "lucide-react";
 import { api, formatINR, logoutCustomer } from "@/lib/api";
 import { useCart } from "@/lib/cart";
+import { useWishlist } from "@/lib/wishlist";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ const emptyProfile = { business_name: "", contact_person: "", email: "", phone: 
 export default function Account() {
   const nav = useNavigate();
   const { addItem } = useCart();
+  const { resetOnLogout } = useWishlist();
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(emptyProfile);
   const [savingProfile, setSavingProfile] = useState(false);
@@ -142,6 +144,7 @@ export default function Account() {
 
   const logout = () => {
     logoutCustomer();
+    resetOnLogout();
     nav("/");
   };
 

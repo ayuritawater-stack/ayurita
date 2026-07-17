@@ -28,6 +28,7 @@ WHATSAPP_TEMPLATE_PARAM_COUNTS: Dict[str, int] = {
     'order_cancelled': 3,
     'bulk_inquiry_update': 2,
     'credit_payment_reminder': 3,
+    'password_reset': 1,
 }
 
 

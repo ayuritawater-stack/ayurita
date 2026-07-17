@@ -23,6 +23,7 @@ import Wishlist from "@/pages/Wishlist";
 import Compare from "@/pages/Compare";
 import SignIn from "@/pages/SignIn";
 import SignUp from "@/pages/SignUp";
+import ForgotPassword from "@/pages/ForgotPassword";
 import Account from "@/pages/Account";
 import Terms from "@/pages/Terms";
 import Privacy from "@/pages/Privacy";
@@ -31,6 +32,7 @@ import CustomerProtectedRoute from "@/components/CustomerProtectedRoute";
 import AdminLogin from "@/pages/admin/AdminLogin";
 import AdminLayout from "@/components/layout/AdminLayout";
 import AdminDashboard from "@/pages/admin/AdminDashboard";
+import AdminAnalytics from "@/pages/admin/AdminAnalytics";
 import AdminProducts from "@/pages/admin/AdminProducts";
 import AdminOrders from "@/pages/admin/AdminOrders";
 import AdminBulkInquiries from "@/pages/admin/AdminBulkInquiries";
@@ -40,6 +42,7 @@ import AdminCategories from "@/pages/admin/AdminCategories";
 import AdminSettings from "@/pages/admin/AdminSettings";
 import AdminStaff from "@/pages/admin/AdminStaff";
 import AdminReviews from "@/pages/admin/AdminReviews";
+import AdminQuestions from "@/pages/admin/AdminQuestions";
 import AdminCustomers from "@/pages/admin/AdminCustomers";
 import AdminReturns from "@/pages/admin/AdminReturns";
 import AdminAuditLog from "@/pages/admin/AdminAuditLog";
@@ -98,6 +101,7 @@ function App() {
                 <Route path="/compare" element={<Compare />} />
                 <Route path="/signin" element={<SignIn />} />
                 <Route path="/signup" element={<SignUp />} />
+                <Route path="/forgot-password" element={<ForgotPassword />} />
 
                 <Route element={<CustomerProtectedRoute />}>
                   <Route path="/checkout" element={<Checkout />} />
@@ -117,12 +121,14 @@ function App() {
                 }
               >
                 <Route index element={<OwnerRoute><AdminDashboard /></OwnerRoute>} />
+                <Route path="analytics" element={<OwnerRoute><AdminAnalytics /></OwnerRoute>} />
                 <Route path="orders" element={<AdminOrders />} />
                 <Route path="products" element={<OwnerRoute><AdminProducts /></OwnerRoute>} />
                 <Route path="categories" element={<OwnerRoute><AdminCategories /></OwnerRoute>} />
                 <Route path="bulk-inquiries" element={<AdminBulkInquiries />} />
                 <Route path="contact-messages" element={<AdminContactMessages />} />
                 <Route path="reviews" element={<AdminReviews />} />
+                <Route path="questions" element={<AdminQuestions />} />
                 <Route path="returns" element={<AdminReturns />} />
                 <Route path="coupons" element={<OwnerRoute><AdminCoupons /></OwnerRoute>} />
                 <Route path="settings" element={<OwnerRoute><AdminSettings /></OwnerRoute>} />

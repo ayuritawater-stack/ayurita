@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { UserPlus } from "lucide-react";
 import { api } from "@/lib/api";
+import { useWishlist } from "@/lib/wishlist";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 export default function SignUp() {
   const nav = useNavigate();
   const loc = useLocation();
+  const { syncAfterLogin } = useWishlist();
   const [form, setForm] = useState({ business_name: "", contact_person: "", email: "", phone: "", password: "", confirm: "" });
   const [loading, setLoading] = useState(false);
 
@@ -34,6 +36,7 @@ export default function SignUp() {
       localStorage.setItem("ayurita_customer_token", data.token);
       localStorage.setItem("ayurita_customer_business_name", data.business_name);
       localStorage.setItem("ayurita_customer_email", data.email);
+      syncAfterLogin();
       toast.success(`Welcome, ${data.business_name}!`);
       nav(loc.state?.from?.pathname || "/account", { replace: true, state: loc.state?.from?.state });
     } catch (err) {

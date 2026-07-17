@@ -1,9 +1,10 @@
 """GST invoice PDF for admin."""
 import io
+import zipfile
 from datetime import datetime
 from html import escape as _esc
-from fastapi import APIRouter, HTTPException, Query, Request, Path
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Path
+from fastapi.responses import StreamingResponse, Response
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -13,8 +14,8 @@ from reportlab.platypus import (
 )
 from reportlab.lib.enums import TA_LEFT, TA_RIGHT, TA_CENTER
 import deps
-from deps import db, get_current_admin
-from models import ORDER_NUMBER_REGEX
+from deps import db, get_current_admin, now_utc
+from models import ORDER_NUMBER_REGEX, BulkOrderIds
 
 router = APIRouter(tags=["invoices"])
 
@@ -175,7 +176,15 @@ Email: {_esc(guest.get('email', ''))}<br/>
             Paragraph(f"Discount ({order.get('coupon_code') or ''})", total_lbl),
             Paragraph("- " + _rupees(order.get("discount", 0)), total_val),
         ])
-    totals_rows.append([Paragraph("GST", total_lbl), Paragraph(_rupees(order.get("gst_total", 0)), total_val)])
+    # Older orders placed before the CGST/SGST split was added only have a combined gst_total -
+    # fall back to halving it so those invoices still render correctly.
+    gst_total = order.get("gst_total", 0) or 0
+    cgst_total = order.get("cgst_total")
+    sgst_total = order.get("sgst_total")
+    if cgst_total is None or sgst_total is None:
+        cgst_total = sgst_total = gst_total / 2
+    totals_rows.append([Paragraph("CGST", total_lbl), Paragraph(_rupees(cgst_total), total_val)])
+    totals_rows.append([Paragraph("SGST", total_lbl), Paragraph(_rupees(sgst_total), total_val)])
     totals_rows.append([Paragraph("Shipping", total_lbl), Paragraph(_rupees(order.get("shipping", 0)), total_val)])
     totals_rows.append([
         Paragraph("<font size='12'><b>GRAND TOTAL</b></font>", ParagraphStyle("gtl", parent=total_lbl, fontSize=12, fontName="Helvetica-Bold")),
@@ -273,5 +282,30 @@ async def admin_download_invoice(
     return StreamingResponse(
         buf,
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/admin/orders/bulk/invoices")
+async def bulk_download_invoices(
+    body: BulkOrderIds,
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
+    business = await _get_business()
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for order_id in body.order_ids:
+            order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+            if not order:
+                continue
+            pdf = _build_invoice_pdf(order, business)
+            zf.writestr(f"Ayurita-Invoice-{order['order_number']}.pdf", pdf.getvalue())
+    buf.seek(0)
+    filename = f"Ayurita-Invoices-{now_utc().strftime('%Y%m%d')}.zip"
+    return StreamingResponse(
+        buf,
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

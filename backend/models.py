@@ -62,6 +62,9 @@ class ProductIn(BaseModel):
     featured: bool = False
     is_active: bool = True
     gst_rate: float = Field(18.0, ge=0, le=100)
+    sale_price: Optional[float] = Field(None, ge=0, le=10_000_000)
+    sale_starts_at: Optional[str] = Field(None, max_length=40)
+    sale_ends_at: Optional[str] = Field(None, max_length=40)
 
 
 class CartItemIn(BaseModel):
@@ -119,13 +122,27 @@ class CouponIn(BaseModel):
     discount_type: Literal["percent", "flat"] = "percent"
     value: float = Field(gt=0, le=1_000_000)
     min_order: float = Field(0, ge=0, le=10_000_000)
+    max_discount: float = Field(0, ge=0, le=10_000_000)
+    usage_limit: int = Field(0, ge=0, le=1_000_000)
     is_active: bool = True
+    starts_at: Optional[str] = Field(None, max_length=40)
     expires_at: Optional[str] = Field(None, max_length=40)
 
 
 class OrderStatusUpdate(BaseModel):
     model_config = _STRICT
     status: Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]
+
+
+class BulkStatusUpdate(BaseModel):
+    model_config = _STRICT
+    order_ids: List[str] = Field(min_length=1, max_length=200)
+    status: Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]
+
+
+class BulkOrderIds(BaseModel):
+    model_config = _STRICT
+    order_ids: List[str] = Field(min_length=1, max_length=200)
 
 
 class BulkInquiryStatusUpdate(BaseModel):
@@ -171,6 +188,25 @@ class StaffCreateIn(BaseModel):
 class StaffRoleUpdate(BaseModel):
     model_config = _STRICT
     admin_role: Literal["owner", "staff"]
+
+
+class StaffUpdateIn(BaseModel):
+    model_config = _STRICT
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    email: Optional[EmailStr] = None
+    password: Optional[str] = Field(None, min_length=6, max_length=100)
+
+
+class ProductQuestionIn(BaseModel):
+    model_config = _STRICT
+    product_id: str = Field(min_length=1, max_length=64)
+    name: str = Field(min_length=1, max_length=200)
+    question: str = Field(min_length=1, max_length=1000)
+
+
+class QuestionAnswerIn(BaseModel):
+    model_config = _STRICT
+    answer: str = Field(min_length=1, max_length=2000)
 
 
 class ReviewIn(BaseModel):
@@ -228,9 +264,26 @@ class AddressIn(BaseModel):
     is_default: bool = False
 
 
+class WishlistMerge(BaseModel):
+    model_config = _STRICT
+    product_ids: List[str] = Field(default_factory=list, max_length=500)
+
+
 class CustomerPasswordChange(BaseModel):
     model_config = _STRICT
     current_password: str = Field(min_length=1, max_length=200)
+    new_password: str = Field(min_length=6, max_length=100)
+
+
+class CustomerForgotPasswordIn(BaseModel):
+    model_config = _STRICT
+    email: EmailStr
+
+
+class CustomerResetPasswordIn(BaseModel):
+    model_config = _STRICT
+    email: EmailStr
+    otp: str = Field(pattern=r"^\d{6}$")
     new_password: str = Field(min_length=6, max_length=100)
 
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle } from "lucide-react";
-import { api, formatINR } from "@/lib/api";
+import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle, Archive } from "lucide-react";
+import { api, formatINR, downloadFile } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const STATUSES = ["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"];
@@ -21,6 +21,10 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [detail, setDetail] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState("confirmed");
+  const [applyingBulk, setApplyingBulk] = useState(false);
+  const [downloadingInvoices, setDownloadingInvoices] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,7 +33,43 @@ export default function AdminOrders() {
     setOrders(data);
     setLoading(false);
   }, [filter]);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { setSelected([]); load(); }, [load]);
+
+  const toggleSelect = (id) => setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  const toggleSelectAll = () => setSelected((s) => (s.length === orders.length ? [] : orders.map((o) => o.id)));
+
+  const applyBulkStatus = async () => {
+    if (!window.confirm(`Update ${selected.length} order(s) to "${bulkStatus}"?`)) return;
+    setApplyingBulk(true);
+    try {
+      const { data } = await api.put("/admin/orders/bulk/status", { order_ids: selected, status: bulkStatus });
+      const failed = data.results.filter((r) => !r.ok);
+      if (failed.length) toast.error(`${failed.length} order(s) failed: ${failed[0].error}`);
+      if (data.updated) toast.success(`${data.updated} order(s) updated`);
+      setSelected([]);
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Bulk update failed");
+    } finally {
+      setApplyingBulk(false);
+    }
+  };
+
+  const downloadBulkInvoices = async () => {
+    setDownloadingInvoices(true);
+    try {
+      await downloadFile(
+        "/admin/orders/bulk/invoices",
+        {},
+        `Ayurita-Invoices-${new Date().toISOString().slice(0, 10)}.zip`,
+        { method: "post", data: { order_ids: selected } },
+      );
+    } catch {
+      toast.error("Failed to download invoices");
+    } finally {
+      setDownloadingInvoices(false);
+    }
+  };
 
   const downloadInvoice = async (id, orderNumber) => {
     try {
@@ -96,10 +136,37 @@ export default function AdminOrders() {
         </div>
       </div>
 
+      {selected.length > 0 && (
+        <div className="card-premium p-4 mb-6 flex flex-wrap items-center gap-3" data-testid="bulk-actions-bar">
+          <span className="text-sm font-semibold text-slate-900">{selected.length} selected</span>
+          <Select value={bulkStatus} onValueChange={setBulkStatus}>
+            <SelectTrigger className="w-40 rounded-xl" data-testid="bulk-status-select"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <button onClick={applyBulkStatus} disabled={applyingBulk} className="btn-secondary" data-testid="apply-bulk-status">
+            {applyingBulk ? "Updating…" : "Update Status"}
+          </button>
+          <button onClick={downloadBulkInvoices} disabled={downloadingInvoices} className="btn-secondary" data-testid="bulk-download-invoices">
+            <Archive className="w-4 h-4" /> {downloadingInvoices ? "Zipping…" : "Download Invoices (ZIP)"}
+          </button>
+          <button onClick={() => setSelected([])} className="text-xs text-slate-500 hover:text-slate-700 ml-auto">Clear selection</button>
+        </div>
+      )}
+
       <div className="card-premium overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
             <tr>
+              <th className="px-6 py-3 w-10">
+                <input
+                  type="checkbox"
+                  checked={orders.length > 0 && selected.length === orders.length}
+                  onChange={toggleSelectAll}
+                  data-testid="select-all-orders"
+                />
+              </th>
               <th className="text-left px-6 py-3">Order #</th>
               <th className="text-left px-6 py-3">Business</th>
               <th className="text-left px-6 py-3">Items</th>
@@ -111,11 +178,19 @@ export default function AdminOrders() {
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan="7" className="p-8 text-center text-slate-500">Loading…</td></tr>
+              <tr><td colSpan="8" className="p-8 text-center text-slate-500">Loading…</td></tr>
             ) : orders.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-slate-500">No orders found.</td></tr>
+              <tr><td colSpan="8" className="p-8 text-center text-slate-500">No orders found.</td></tr>
             ) : orders.map((o) => (
               <tr key={o.id} className="hover:bg-slate-50" data-testid={`order-row-${o.order_number}`}>
+                <td className="px-6 py-3">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(o.id)}
+                    onChange={() => toggleSelect(o.id)}
+                    data-testid={`select-order-${o.order_number}`}
+                  />
+                </td>
                 <td className="px-6 py-3 font-mono text-xs text-slate-900 font-semibold">
                   <div className="flex items-center gap-1.5">
                     {o.order_number}
@@ -204,7 +279,8 @@ export default function AdminOrders() {
               <div className="card-premium p-4 space-y-2 text-sm">
                 <div className="flex justify-between"><span className="text-slate-600">Subtotal</span><span>{formatINR(detail.subtotal)}</span></div>
                 {detail.discount > 0 && <div className="flex justify-between text-brand-emerald"><span>Discount</span><span>-{formatINR(detail.discount)}</span></div>}
-                <div className="flex justify-between"><span className="text-slate-600">GST</span><span>{formatINR(detail.gst_total)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">CGST</span><span>{formatINR(detail.cgst_total ?? detail.gst_total / 2)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">SGST</span><span>{formatINR(detail.sgst_total ?? detail.gst_total / 2)}</span></div>
                 <div className="flex justify-between"><span className="text-slate-600">Shipping</span><span>{formatINR(detail.shipping)}</span></div>
                 <div className="flex justify-between pt-2 border-t border-slate-100">
                   <span className="font-semibold">Grand Total</span>

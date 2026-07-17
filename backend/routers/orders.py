@@ -4,10 +4,13 @@ from datetime import timedelta
 from typing import Literal, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, Request, Path
 import deps
-from deps import db, get_current_admin, get_current_customer, new_id, now_utc, iso, gen_order_number
-from models import OrderIn, OrderStatusUpdate, CartItemIn, ORDER_NUMBER_REGEX
+from deps import db, get_current_admin, get_current_customer, new_id, now_utc, iso, gen_order_number, parse_dt
+from models import OrderIn, OrderStatusUpdate, BulkStatusUpdate, CartItemIn, ORDER_NUMBER_REGEX
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message, send_text_message
+from routers.coupons import validate_coupon_doc
+from security import get_client_ip
+from audit import record_audit
 
 router = APIRouter(tags=["orders"])
 logger = logging.getLogger("ayurita")
@@ -79,21 +82,41 @@ def _notify_order_status(order: dict) -> None:
         logger.exception("Failed to send WhatsApp status notification for order %s", order.get("order_number"))
 
 
+def _flash_sale_active(p: dict) -> bool:
+    if p.get("sale_price") is None:
+        return False
+    now = now_utc()
+    starts_at = parse_dt(p.get("sale_starts_at"))
+    if starts_at and starts_at > now:
+        return False
+    ends_at = parse_dt(p.get("sale_ends_at"))
+    if ends_at and ends_at < now:
+        return False
+    return True
+
+
 def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optional[dict], shipping_settings: dict):
     subtotal = 0.0
     gst_total = 0.0
+    cgst_total = 0.0
+    sgst_total = 0.0
     order_items = []
     for item in items:
         p = products_map.get(item.product_id)
         if not p:
             raise HTTPException(status_code=400, detail=f"Product {item.product_id} not found")
-        unit_price = p["price"]
-        if p.get("bulk_price") and item.quantity >= p.get("moq", 1) * 10:
+        if _flash_sale_active(p):
+            unit_price = p["sale_price"]
+        elif p.get("bulk_price") and item.quantity >= p.get("moq", 1) * 10:
             unit_price = p["bulk_price"]
+        else:
+            unit_price = p["price"]
         line_subtotal = unit_price * item.quantity
         line_gst = line_subtotal * (p.get("gst_rate", 18) / 100)
         subtotal += line_subtotal
         gst_total += line_gst
+        cgst_total += line_gst / 2
+        sgst_total += line_gst / 2
         order_items.append({
             "product_id": p["id"],
             "product_name": p["name"],
@@ -108,6 +131,8 @@ def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optiona
     if coupon:
         if coupon["discount_type"] == "percent":
             discount = subtotal * (coupon["value"] / 100)
+            if coupon.get("max_discount"):
+                discount = min(discount, coupon["max_discount"])
         else:
             discount = coupon["value"]
     free_above = shipping_settings.get("free_shipping_above", 500.0)
@@ -119,6 +144,8 @@ def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optiona
         "subtotal": round(subtotal, 2),
         "discount": round(discount, 2),
         "gst_total": round(gst_total, 2),
+        "cgst_total": round(cgst_total, 2),
+        "sgst_total": round(sgst_total, 2),
         "shipping": shipping,
         "grand_total": grand_total,
     }
@@ -133,11 +160,22 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
     if not products_map:
         raise HTTPException(status_code=400, detail="No valid products in cart")
 
+    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0}) or {}
+
     coupon = None
     if body.coupon_code:
         coupon = await db.coupons.find_one({"code": body.coupon_code.upper().strip(), "is_active": True}, {"_id": 0})
+        if not coupon:
+            raise HTTPException(status_code=400, detail=f'Coupon "{body.coupon_code}" is no longer valid')
+        # Re-validate server-side even though the frontend already called
+        # /coupons/validate/{code} - that endpoint is advisory only, a client could otherwise
+        # call this endpoint directly with an expired/over-limit/not-yet-started code.
+        prelim_subtotal = _compute_totals(products_map, body.items, None, settings)["subtotal"]
+        try:
+            validate_coupon_doc(coupon, prelim_subtotal)
+        except HTTPException as exc:
+            raise HTTPException(status_code=400, detail=f'Coupon "{body.coupon_code}" is no longer valid: {exc.detail}')
 
-    settings = await db.settings.find_one({"id": "app-settings"}, {"_id": 0}) or {}
     totals = _compute_totals(products_map, body.items, coupon, settings)
     order_number = gen_order_number()
     now_str = iso(now_utc())
@@ -159,7 +197,9 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
         # Buy-now-pay-later on a wholesale credit line. The limit is owner-set (see
         # routers/credit.py) and only ever grows via explicit admin action, never via a
         # customer request, so it's safe to trust the value already on the customer document
-        # fetched by get_current_customer.
+        # fetched by get_current_customer. Validation only here - the actual balance increment
+        # happens after stock/coupon are successfully reserved below, so a failed reservation
+        # never leaves a dangling credit charge.
         credit_limit = customer.get("credit_limit", 0.0)
         if credit_limit <= 0:
             raise HTTPException(status_code=400, detail="Your account isn't enabled for credit orders yet. Contact us to set up a wholesale credit line.")
@@ -170,6 +210,42 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
         order["credit_due_date"] = iso(now_utc() + timedelta(days=due_days))
         order["amount_paid"] = 0.0
         order["credit_status"] = "unpaid"
+
+    # Atomically reserve stock per line item - the filter's stock>=quantity check and the
+    # decrement happen in one operation, so two concurrent checkouts racing for the last units
+    # can't both succeed. Anything already reserved is rolled back if a later item/coupon fails.
+    reserved: List[dict] = []
+    for order_item in totals["items"]:
+        res = await db.products.update_one(
+            {"id": order_item["product_id"], "stock": {"$gte": order_item["quantity"]}},
+            {"$inc": {"stock": -order_item["quantity"]}},
+        )
+        if res.matched_count == 0:
+            for r in reserved:
+                await db.products.update_one({"id": r["product_id"]}, {"$inc": {"stock": r["quantity"]}})
+            raise HTTPException(status_code=400, detail=f"Insufficient stock for {order_item['product_name']}")
+        reserved.append(order_item)
+
+    if coupon:
+        # Same race-safety as stock above: fold the usage_limit check into the update filter
+        # instead of check-then-increment, so two concurrent checkouts can't both pass the limit
+        # check and both redeem it, overrunning usage_limit.
+        coupon_res = await db.coupons.update_one(
+            {
+                "code": coupon["code"],
+                "$or": [
+                    {"usage_limit": {"$in": [0, None]}},
+                    {"$expr": {"$lt": ["$used_count", "$usage_limit"]}},
+                ],
+            },
+            {"$inc": {"used_count": 1}},
+        )
+        if coupon_res.matched_count == 0:
+            for r in reserved:
+                await db.products.update_one({"id": r["product_id"]}, {"$inc": {"stock": r["quantity"]}})
+            raise HTTPException(status_code=400, detail=f'Coupon "{coupon["code"]}" just reached its usage limit. Please remove it and try again.')
+
+    if body.payment_method == "credit":
         await db.customers.update_one({"id": customer["id"]}, {"$inc": {"credit_balance": totals["grand_total"]}})
 
     # Flag unusually large orders, and a customer's very first credit order, so the admin
@@ -227,6 +303,76 @@ async def admin_get_order(admin: dict = Depends(get_current_admin), order_id: st
     return order
 
 
+async def _release_stock(order: dict) -> None:
+    for it in order.get("items", []):
+        await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": it["quantity"]}})
+
+
+async def _reserve_stock(order: dict) -> None:
+    """Atomically re-reserves stock for every line item, matching create_order's reservation
+    pattern - rolls back anything already reserved in this call if a later line can't be, since
+    the stock may have since been sold to someone else while this order sat cancelled."""
+    reserved: List[dict] = []
+    for it in order.get("items", []):
+        res = await db.products.update_one(
+            {"id": it["product_id"], "stock": {"$gte": it["quantity"]}},
+            {"$inc": {"stock": -it["quantity"]}},
+        )
+        if res.matched_count == 0:
+            for r in reserved:
+                await db.products.update_one({"id": r["product_id"]}, {"$inc": {"stock": r["quantity"]}})
+            raise HTTPException(status_code=400, detail=f"Insufficient stock for {it['product_name']} to un-cancel this order")
+        reserved.append(it)
+
+
+async def _apply_order_status(order_id: str, status: str, request: Request, admin_email: str) -> dict:
+    order = await db.orders.find_one({"id": order_id})
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    old_status = order.get("status")
+
+    # Cancelling releases the stock the order reserved at checkout; un-cancelling re-reserves
+    # it, failing cleanly (before anything else changes) if that stock has since been sold
+    # elsewhere.
+    if status == "cancelled" and old_status != "cancelled":
+        await _release_stock(order)
+    elif old_status == "cancelled" and status != "cancelled":
+        await _reserve_stock(order)
+
+    now_str = iso(now_utc())
+    timeline = order.get("timeline", [])
+    timeline.append({"status": status, "at": now_str, "note": f"Marked {status}"})
+    await db.orders.update_one(
+        {"id": order_id},
+        {"$set": {"status": status, "updated_at": now_str, "timeline": timeline}},
+    )
+    updated_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    await record_audit(db, admin_email, get_client_ip(request), "update_order_status", order_id, {"status": status})
+    if status != old_status:
+        _notify_order_status(updated_order)
+    return updated_order
+
+
+# Registered ahead of /admin/orders/{order_id}/status below - both share the same 4-segment
+# shape ("admin/orders/<x>/status"), and FastAPI matches routes in registration order, so a PUT
+# to .../bulk/status would otherwise be swallowed by {order_id}="bulk" on the single-order route.
+@router.put("/admin/orders/bulk/status")
+async def bulk_update_order_status(
+    body: BulkStatusUpdate,
+    request: Request,
+    admin: dict = Depends(get_current_admin),
+):
+    deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
+    results = []
+    for order_id in body.order_ids:
+        try:
+            await _apply_order_status(order_id, body.status, request, admin["email"])
+            results.append({"id": order_id, "ok": True})
+        except HTTPException as exc:
+            results.append({"id": order_id, "ok": False, "error": exc.detail})
+    return {"updated": sum(1 for r in results if r["ok"]), "results": results}
+
+
 @router.put("/admin/orders/{order_id}/status")
 async def update_order_status(
     body: OrderStatusUpdate,
@@ -235,16 +381,4 @@ async def update_order_status(
     order_id: str = Path(min_length=1, max_length=64),
 ):
     deps.check_authenticated_rate_limit(request, "admin_write", admin["id"])
-    order = await db.orders.find_one({"id": order_id})
-    if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
-    now_str = iso(now_utc())
-    timeline = order.get("timeline", [])
-    timeline.append({"status": body.status, "at": now_str, "note": f"Marked {body.status}"})
-    await db.orders.update_one(
-        {"id": order_id},
-        {"$set": {"status": body.status, "updated_at": now_str, "timeline": timeline}},
-    )
-    updated_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
-    _notify_order_status(updated_order)
-    return updated_order
+    return await _apply_order_status(order_id, body.status, request, admin["email"])

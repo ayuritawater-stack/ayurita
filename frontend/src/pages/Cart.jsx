@@ -3,9 +3,10 @@ import { Minus, Plus, Trash2, ShoppingBag, ArrowRight } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useSettings } from "@/lib/settings";
 import { formatINR } from "@/lib/api";
+import { effectivePrice } from "@/lib/pricing";
 
 export default function Cart() {
-  const { items, removeItem, updateQty, subtotal } = useCart();
+  const { items, removeItem, updateQty, subtotal, cgst, sgst } = useCart();
   const { shippingFlat, freeShippingAbove } = useSettings();
 
   if (items.length === 0) {
@@ -25,9 +26,8 @@ export default function Cart() {
     );
   }
 
-  const gst = subtotal * 0.18;
   const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
-  const total = subtotal + gst + shipping;
+  const total = subtotal + cgst + sgst + shipping;
 
   return (
     <div className="py-12 md:py-16">
@@ -38,7 +38,7 @@ export default function Cart() {
         <div className="grid lg:grid-cols-[1fr_400px] gap-8">
           <div className="space-y-4" data-testid="cart-items">
             {items.map((item) => {
-              const price = item.bulk_price && item.quantity >= (item.moq || 1) * 10 ? item.bulk_price : item.price;
+              const price = effectivePrice(item, item.quantity);
               return (
                 <div key={item.product_id} className="card-premium p-4 flex gap-4 items-center" data-testid={`cart-item-${item.slug}`}>
                   <img src={item.image} alt={item.name} className="w-24 h-24 rounded-xl object-cover bg-slate-100" />
@@ -85,7 +85,8 @@ export default function Cart() {
             <div className="font-heading font-bold text-lg text-slate-900 mb-4">Order Summary</div>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-slate-600">Subtotal</span><span className="font-semibold">{formatINR(subtotal)}</span></div>
-              <div className="flex justify-between"><span className="text-slate-600">GST (18%)</span><span className="font-semibold">{formatINR(gst)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">CGST</span><span className="font-semibold">{formatINR(cgst)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">SGST</span><span className="font-semibold">{formatINR(sgst)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">Shipping</span><span className="font-semibold">{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
               <div className="border-t border-slate-100 pt-3 mt-3 flex justify-between items-center">
                 <span className="text-slate-900 font-semibold">Grand Total</span>

@@ -5,12 +5,14 @@ import { formatINR } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { useCompare } from "@/lib/compare";
+import { isFlashSaleActive } from "@/lib/pricing";
 import { toast } from "sonner";
 
 export default function ProductCard({ product, index = 0 }) {
   const { addItem } = useCart();
   const { toggle: toggleWl, has: inWl } = useWishlist();
   const { toggle: toggleCompare, has: inCompare } = useCompare();
+  const onSale = isFlashSaleActive(product);
 
   const handleAdd = (e) => {
     e.preventDefault();
@@ -51,6 +53,9 @@ export default function ProductCard({ product, index = 0 }) {
           {product.featured && (
             <span className="chip !bg-emerald-50 !text-brand-emerald">Featured</span>
           )}
+          {onSale && (
+            <span className="chip !bg-rose-500 !text-white">Sale</span>
+          )}
         </div>
         <div className="absolute top-3 right-3 flex flex-col gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
           <button
@@ -88,7 +93,14 @@ export default function ProductCard({ product, index = 0 }) {
           <div>
             <div className="text-[10px] text-slate-500 uppercase tracking-wider">From</div>
             <div className="text-xl font-bold text-slate-900 font-heading">
-              {formatINR(product.bulk_price || product.price)}
+              {onSale ? (
+                <>
+                  <span className="text-rose-600">{formatINR(product.sale_price)}</span>
+                  <span className="text-sm font-medium text-slate-400 line-through ml-1.5">{formatINR(product.price)}</span>
+                </>
+              ) : (
+                formatINR(product.bulk_price || product.price)
+              )}
               <span className="text-xs font-medium text-slate-500 ml-1">/ unit</span>
             </div>
             {product.moq > 1 && (

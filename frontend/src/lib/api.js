@@ -60,5 +60,21 @@ export const BUSINESS = {
   mapEmbed: "https://www.google.com/maps?q=Bishanpur,Begusarai,Bihar+851129&output=embed",
 };
 
+// Fetches a file via the authenticated `api` instance (so admin-only exports carry the bearer
+// token) and triggers a browser download - axios's own responseType:'blob' plus a synthetic
+// <a> click, since a plain <a href> to the API URL wouldn't include the Authorization header.
+// `config` optionally overrides method/data, e.g. { method: "post", data: {...} } for endpoints
+// that need a request body (like a bulk ZIP export) rather than a plain GET.
+export const downloadFile = async (url, params, filename, config = {}) => {
+  const { method = "get", data: body } = config;
+  const { data } = await api.request({ url, method, params, data: body, responseType: "blob" });
+  const blobUrl = URL.createObjectURL(data);
+  const a = document.createElement("a");
+  a.href = blobUrl;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(blobUrl);
+};
+
 export const formatINR = (n) =>
   new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n || 0);

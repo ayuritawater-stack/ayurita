@@ -1,7 +1,7 @@
 """Analytics router."""
 from datetime import timedelta, datetime, timezone
 from collections import defaultdict
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from deps import db, require_owner, now_utc, iso
 
 router = APIRouter(tags=["analytics"])
@@ -108,3 +108,102 @@ async def analytics_summary(admin: dict = Depends(require_owner)):
             "total_credit_outstanding": 0.0,
             "overdue_credit_count": 0,
         }
+
+
+@router.get("/admin/analytics")
+async def analytics_range(days: int = Query(30, ge=1, le=180), admin: dict = Depends(require_owner)):
+    """Deeper, date-ranged analytics distinct from /summary above: average order value,
+    repeat-customer rate, top products by revenue (not just quantity), and sales-velocity-based
+    reorder suggestions - all scoped to the last `days` days rather than all-time."""
+    now = now_utc()
+    start = now - timedelta(days=days - 1)
+    start_key = start.strftime("%Y-%m-%d")
+
+    docs = await db.orders.find(
+        {"status": {"$ne": "cancelled"}, "created_at": {"$gte": start_key}},
+        {"_id": 0, "created_at": 1, "grand_total": 1, "customer_id": 1},
+    ).to_list(200000)
+
+    by_day: dict = {}
+    for i in range(days):
+        d = (now - timedelta(days=days - 1 - i)).strftime("%Y-%m-%d")
+        by_day[d] = {"revenue": 0.0, "orders": 0}
+    for o in docs:
+        d = (o.get("created_at") or "")[:10]
+        if d in by_day:
+            by_day[d]["revenue"] += o.get("grand_total", 0)
+            by_day[d]["orders"] += 1
+    revenue_trend = [{"date": k, "revenue": round(v["revenue"], 2), "orders": v["orders"]} for k, v in by_day.items()]
+    total_revenue_range = round(sum(v["revenue"] for v in by_day.values()), 2)
+    total_orders_range = sum(v["orders"] for v in by_day.values())
+    avg_order_value = round(total_revenue_range / total_orders_range, 2) if total_orders_range else 0.0
+
+    # Repeat-customer rate, keyed by customer_id (the account) rather than a delivery mobile
+    # number - a customer's address book means a different delivery contact per order no
+    # longer reliably identifies "the same customer".
+    order_counts_by_customer: dict = {}
+    for o in docs:
+        cid = o.get("customer_id")
+        if cid:
+            order_counts_by_customer[cid] = order_counts_by_customer.get(cid, 0) + 1
+    total_customers_range = len(order_counts_by_customer)
+    repeat_customers = sum(1 for c in order_counts_by_customer.values() if c > 1)
+    repeat_rate = round(repeat_customers / total_customers_range * 100, 1) if total_customers_range else 0.0
+
+    top_pipeline = [
+        {"$match": {"status": {"$ne": "cancelled"}, "created_at": {"$gte": start_key}}},
+        {"$unwind": "$items"},
+        {"$group": {
+            "_id": "$items.product_id",
+            "name": {"$last": "$items.product_name"},
+            "qty": {"$sum": "$items.quantity"},
+            "revenue": {"$sum": "$items.line_total"},
+        }},
+        {"$sort": {"revenue": -1}},
+        {"$limit": 10},
+    ]
+    top_products = await db.orders.aggregate(top_pipeline).to_list(10)
+    for tp in top_products:
+        tp["product_id"] = tp.pop("_id")
+        tp["revenue"] = round(tp.get("revenue", 0), 2)
+
+    # Reorder suggestions: estimate "runs out in ~N days" from actual sales velocity over the
+    # selected range, instead of a flat stock-below-threshold check (see /summary's
+    # low_stock_products) - a product selling 20 units/day at 100 in stock is far more urgent
+    # to reorder than one selling 1/day at the same stock level.
+    velocity_pipeline = [
+        {"$match": {"status": {"$ne": "cancelled"}, "created_at": {"$gte": start_key}}},
+        {"$unwind": "$items"},
+        {"$group": {"_id": "$items.product_id", "qty": {"$sum": "$items.quantity"}}},
+    ]
+    qty_by_product = {d["_id"]: d["qty"] for d in await db.orders.aggregate(velocity_pipeline).to_list(10000)}
+    active_products = await db.products.find({"is_active": True}, {"_id": 0, "id": 1, "name": 1, "stock": 1}).to_list(10000)
+    reorder_suggestions = []
+    for p in active_products:
+        qty = qty_by_product.get(p["id"], 0)
+        if qty <= 0:
+            continue
+        velocity = qty / days
+        stock = p.get("stock", 0)
+        days_left = round(stock / velocity, 1) if velocity > 0 else None
+        if days_left is not None and days_left <= 30:
+            reorder_suggestions.append({
+                "product_id": p["id"], "name": p["name"], "stock": stock,
+                "daily_velocity": round(velocity, 2), "days_left": days_left,
+            })
+    reorder_suggestions.sort(key=lambda r: r["days_left"])
+    reorder_suggestions = reorder_suggestions[:15]
+
+    return {
+        "days": days,
+        "revenue_trend": revenue_trend,
+        "total_revenue_range": total_revenue_range,
+        "total_orders_range": total_orders_range,
+        "avg_order_value": avg_order_value,
+        "total_customers_range": total_customers_range,
+        "repeat_customers": repeat_customers,
+        "one_time_customers": total_customers_range - repeat_customers,
+        "repeat_rate": repeat_rate,
+        "top_products": top_products,
+        "reorder_suggestions": reorder_suggestions,
+    }

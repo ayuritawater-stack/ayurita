@@ -106,7 +106,11 @@ async def run_seed():
                 "discount_type": "percent",
                 "value": 10,
                 "min_order": 500,
+                "max_discount": 0,
+                "usage_limit": 0,
+                "used_count": 0,
                 "is_active": True,
+                "starts_at": None,
                 "expires_at": None,
                 "created_at": iso(now_utc()),
             })

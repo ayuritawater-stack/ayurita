@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Package, Edit3, Trash2, Plus, X } from "lucide-react";
-import { api, formatINR } from "@/lib/api";
+import { Package, Edit3, Trash2, Plus, X, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { api, formatINR, downloadFile } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -12,6 +12,7 @@ const EMPTY = {
   name: "", slug: "", category_id: "", category_name: "", size: "500ml",
   price: 0, bulk_price: 0, moq: 1, stock: 0, unit: "unit", packaging: "",
   description: "", images: [], featured: false, is_active: true, gst_rate: 18,
+  sale_price: null, sale_starts_at: null, sale_ends_at: null,
 };
 
 export default function AdminProducts() {
@@ -20,6 +21,9 @@ export default function AdminProducts() {
   const [editing, setEditing] = useState(null); // product or EMPTY
   const [imageInput, setImageInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const fileInputRef = useRef(null);
 
   const load = async () => {
     setLoading(true);
@@ -31,7 +35,15 @@ export default function AdminProducts() {
   useEffect(() => { load(); }, []);
 
   const onSave = async () => {
-    const payload = { ...editing, price: Number(editing.price), bulk_price: Number(editing.bulk_price) || null, moq: Number(editing.moq), stock: Number(editing.stock), gst_rate: Number(editing.gst_rate) };
+    const payload = {
+      ...editing,
+      price: Number(editing.price),
+      bulk_price: Number(editing.bulk_price) || null,
+      moq: Number(editing.moq),
+      stock: Number(editing.stock),
+      gst_rate: Number(editing.gst_rate),
+      sale_price: editing.sale_price ? Number(editing.sale_price) : null,
+    };
     if (!payload.slug) payload.slug = payload.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const cat = cats.find((c) => c.id === payload.category_id);
     if (cat) payload.category_name = cat.name;
@@ -63,6 +75,29 @@ export default function AdminProducts() {
     setImageInput("");
   };
 
+  const exportCsv = () =>
+    downloadFile("/products/export", {}, `ayurita-products-${new Date().toISOString().slice(0, 10)}.csv`).catch(() => toast.error("Export failed"));
+  const downloadTemplate = () =>
+    downloadFile("/products/import/template", {}, "ayurita-products-import-template.csv").catch(() => toast.error("Download failed"));
+
+  const importCsv = async (file) => {
+    if (!file) return;
+    const form = new FormData();
+    form.append("file", file);
+    setImporting(true);
+    try {
+      const { data } = await api.post("/products/import", form);
+      setImportResult(data);
+      if (data.created || data.updated) toast.success(`Imported: ${data.created} created, ${data.updated} updated`);
+      if (data.errors?.length) toast.error(`${data.errors.length} row(s) had errors — see details`);
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Import failed");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-8">
@@ -70,10 +105,48 @@ export default function AdminProducts() {
           <div className="text-xs uppercase tracking-[0.18em] font-semibold text-brand-primary">Products</div>
           <h1 className="font-heading font-bold text-3xl tracking-tight text-slate-900 mt-1">Product Management</h1>
         </div>
-        <button onClick={() => setEditing({ ...EMPTY })} className="btn-primary" data-testid="add-product-btn">
-          <Plus className="w-4 h-4" /> Add Product
-        </button>
+        <div className="flex gap-2">
+          <button onClick={downloadTemplate} className="btn-secondary" title="Download a blank CSV to fill in">
+            <FileSpreadsheet className="w-4 h-4" /> Template
+          </button>
+          <button onClick={exportCsv} className="btn-secondary" data-testid="export-products">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => { importCsv(e.target.files[0]); e.target.value = ""; }}
+            data-testid="import-products-input"
+          />
+          <button onClick={() => fileInputRef.current?.click()} className="btn-secondary" disabled={importing} data-testid="import-products-btn">
+            <Upload className="w-4 h-4" /> {importing ? "Importing…" : "Import CSV"}
+          </button>
+          <button onClick={() => setEditing({ ...EMPTY })} className="btn-primary" data-testid="add-product-btn">
+            <Plus className="w-4 h-4" /> Add Product
+          </button>
+        </div>
       </div>
+
+      {importResult && (
+        <div className="card-premium p-4 mb-6 space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="font-heading font-semibold text-sm text-slate-900">
+              Import result: {importResult.created} created, {importResult.updated} updated
+              {importResult.errors?.length ? `, ${importResult.errors.length} error(s)` : ""}
+            </div>
+            <button onClick={() => setImportResult(null)} className="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+          {importResult.errors?.length > 0 && (
+            <div className="space-y-1 max-h-40 overflow-auto text-xs text-rose-600">
+              {importResult.errors.map((e, i) => <div key={i}>Row {e.row}: {e.message}</div>)}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="card-premium overflow-hidden">
         <table className="w-full text-sm">
@@ -118,6 +191,7 @@ export default function AdminProducts() {
                     {p.is_active ? "Active" : "Inactive"}
                   </span>
                   {p.featured && <span className="chip !bg-amber-50 !text-amber-600 ml-1">Featured</span>}
+                  {p.sale_price != null && <span className="chip !bg-rose-50 !text-rose-600 ml-1">Sale</span>}
                 </td>
                 <td className="px-6 py-3 text-right">
                   <button onClick={() => setEditing({ ...p })} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center" data-testid={`edit-product-${p.slug}`}>
@@ -190,6 +264,23 @@ export default function AdminProducts() {
                 <div>
                   <Label>GST %</Label>
                   <Input type="number" value={editing.gst_rate} onChange={(e) => setEditing({ ...editing, gst_rate: e.target.value })} className="mt-1.5 rounded-xl" />
+                </div>
+              </div>
+              <div className="border-t border-slate-100 pt-4">
+                <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2">Flash Sale (optional)</div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <Label>Sale Price (₹)</Label>
+                    <Input type="number" value={editing.sale_price ?? ""} onChange={(e) => setEditing({ ...editing, sale_price: e.target.value === "" ? null : e.target.value })} className="mt-1.5 rounded-xl" placeholder="None" />
+                  </div>
+                  <div>
+                    <Label>Starts At</Label>
+                    <Input type="datetime-local" value={editing.sale_starts_at ? editing.sale_starts_at.slice(0, 16) : ""} onChange={(e) => setEditing({ ...editing, sale_starts_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className="mt-1.5 rounded-xl" />
+                  </div>
+                  <div>
+                    <Label>Ends At</Label>
+                    <Input type="datetime-local" value={editing.sale_ends_at ? editing.sale_ends_at.slice(0, 16) : ""} onChange={(e) => setEditing({ ...editing, sale_ends_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className="mt-1.5 rounded-xl" />
+                  </div>
                 </div>
               </div>
               <div>

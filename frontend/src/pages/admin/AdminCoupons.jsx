@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 
-const EMPTY = { code: "", discount_type: "percent", value: 10, min_order: 0, is_active: true, expires_at: null };
+const EMPTY = { code: "", discount_type: "percent", value: 10, min_order: 0, max_discount: 0, usage_limit: 0, is_active: true, starts_at: null, expires_at: null };
 
 export default function AdminCoupons() {
   const [coupons, setCoupons] = useState([]);
@@ -23,7 +23,13 @@ export default function AdminCoupons() {
   useEffect(() => { load(); }, []);
 
   const onSave = async () => {
-    const payload = { ...editing, value: Number(editing.value), min_order: Number(editing.min_order) };
+    const payload = {
+      ...editing,
+      value: Number(editing.value),
+      min_order: Number(editing.min_order),
+      max_discount: Number(editing.max_discount) || 0,
+      usage_limit: Number(editing.usage_limit) || 0,
+    };
     try {
       if (editing.id) await api.put(`/coupons/${editing.id}`, payload);
       else await api.post("/coupons", payload);
@@ -75,6 +81,9 @@ export default function AdminCoupons() {
                 {c.discount_type === "percent" ? `${c.value}% off` : `${formatINR(c.value)} off`}
               </div>
               <div className="text-xs text-slate-500 mt-1">Min order {formatINR(c.min_order)}</div>
+              {!!c.usage_limit && (
+                <div className="text-xs text-slate-500">Used {c.used_count || 0} / {c.usage_limit}</div>
+              )}
               <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
                 <button onClick={() => setEditing({ ...c })} className="btn-secondary flex-1 !py-2"><Edit3 className="w-3.5 h-3.5" /> Edit</button>
                 <button onClick={() => onDelete(c.id)} className="w-10 rounded-full bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center"><Trash2 className="w-4 h-4" /></button>
@@ -116,6 +125,24 @@ export default function AdminCoupons() {
               <div>
                 <Label>Minimum Order (₹)</Label>
                 <Input type="number" value={editing.min_order} onChange={(e) => setEditing({ ...editing, min_order: e.target.value })} className="mt-1.5 rounded-xl" />
+              </div>
+              {editing.discount_type === "percent" && (
+                <div>
+                  <Label>Max Discount Cap (₹, 0 = no cap)</Label>
+                  <Input type="number" value={editing.max_discount ?? 0} onChange={(e) => setEditing({ ...editing, max_discount: e.target.value })} className="mt-1.5 rounded-xl" />
+                </div>
+              )}
+              <div>
+                <Label>Usage Limit (0 = unlimited)</Label>
+                <Input type="number" value={editing.usage_limit ?? 0} onChange={(e) => setEditing({ ...editing, usage_limit: e.target.value })} className="mt-1.5 rounded-xl" />
+              </div>
+              <div>
+                <Label>Starts At (optional)</Label>
+                <Input type="datetime-local" value={editing.starts_at ? editing.starts_at.slice(0, 16) : ""} onChange={(e) => setEditing({ ...editing, starts_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className="mt-1.5 rounded-xl" />
+              </div>
+              <div>
+                <Label>Expires At (optional)</Label>
+                <Input type="datetime-local" value={editing.expires_at ? editing.expires_at.slice(0, 16) : ""} onChange={(e) => setEditing({ ...editing, expires_at: e.target.value ? new Date(e.target.value).toISOString() : null })} className="mt-1.5 rounded-xl" />
               </div>
               <div className="flex items-center justify-between pt-2">
                 <span className="text-sm">Active</span>

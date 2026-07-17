@@ -38,6 +38,22 @@ def iso(dt: datetime) -> str:
     return dt.isoformat()
 
 
+def parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """Parses an admin-set ISO datetime string (coupon/flash-sale windows) into an aware UTC
+    datetime, so it's always safely comparable against now_utc(). These strings come from the
+    frontend's `new Date(...).toISOString()`, which is timezone-aware ("Z" suffix) - but a naive
+    string is still treated as UTC rather than raising, since older records may predate this."""
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
 def new_id() -> str:
     return str(uuid.uuid4())
 

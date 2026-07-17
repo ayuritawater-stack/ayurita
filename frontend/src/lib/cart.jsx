@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from "react";
+import { effectivePrice } from "@/lib/pricing";
 
 const CartContext = createContext(null);
 const STORAGE_KEY = "ayurita_cart_v1";
@@ -34,6 +35,10 @@ export function CartProvider({ children }) {
           size: product.size,
           price: product.price,
           bulk_price: product.bulk_price,
+          sale_price: product.sale_price,
+          sale_starts_at: product.sale_starts_at,
+          sale_ends_at: product.sale_ends_at,
+          gst_rate: product.gst_rate,
           moq: product.moq,
           image: product.images?.[0],
           quantity,
@@ -52,15 +57,24 @@ export function CartProvider({ children }) {
 
   const clear = () => setItems([]);
 
-  const subtotal = items.reduce((s, i) => {
-    const price = i.bulk_price && i.quantity >= (i.moq || 1) * 10 ? i.bulk_price : i.price;
-    return s + price * i.quantity;
-  }, 0);
+  const subtotal = items.reduce((s, i) => s + effectivePrice(i, i.quantity) * i.quantity, 0);
+
+  // Split each line's GST in half (CGST + SGST), same convention as the backend for an
+  // intra-state sale - see backend/routers/orders.py::_compute_totals.
+  const { cgst, sgst } = items.reduce(
+    (acc, i) => {
+      const lineGst = effectivePrice(i, i.quantity) * i.quantity * ((i.gst_rate ?? 18) / 100);
+      acc.cgst += lineGst / 2;
+      acc.sgst += lineGst / 2;
+      return acc;
+    },
+    { cgst: 0, sgst: 0 },
+  );
 
   const count = items.reduce((s, i) => s + i.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateQty, clear, subtotal, count }}>
+    <CartContext.Provider value={{ items, addItem, removeItem, updateQty, clear, subtotal, cgst, sgst, count }}>
       {children}
     </CartContext.Provider>
   );

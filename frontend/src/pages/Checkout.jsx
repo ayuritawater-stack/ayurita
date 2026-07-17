@@ -5,6 +5,7 @@ import { CheckCircle2, ArrowRight, Wallet } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useSettings } from "@/lib/settings";
 import { api, formatINR } from "@/lib/api";
+import { effectivePrice } from "@/lib/pricing";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -26,7 +27,7 @@ const loadRazorpayScript = () =>
 export default function Checkout() {
   const nav = useNavigate();
   const { shippingFlat, freeShippingAbove } = useSettings();
-  const { items, subtotal, clear } = useCart();
+  const { items, subtotal, cgst, sgst, clear } = useCart();
   const [submitting, setSubmitting] = useState(false);
   const [payment, setPayment] = useState("cod");
   const [coupon, setCoupon] = useState("");
@@ -93,10 +94,17 @@ export default function Checkout() {
     }
   };
 
-  const discount = couponData ? (couponData.discount_type === "percent" ? subtotal * (couponData.value / 100) : couponData.value) : 0;
-  const gst = (subtotal - discount) * 0.18;
+  let discount = 0;
+  if (couponData) {
+    discount = couponData.discount_type === "percent" ? subtotal * (couponData.value / 100) : couponData.value;
+    if (couponData.discount_type === "percent" && couponData.max_discount) {
+      discount = Math.min(discount, couponData.max_discount);
+    }
+  }
+  // GST is computed on the full line subtotal, same as backend/routers/orders.py -
+  // discount is applied as its own line after, not as a reduction to the taxable amount.
   const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
-  const total = subtotal - discount + gst + shipping;
+  const total = subtotal - discount + cgst + sgst + shipping;
   const availableCredit = credit.credit_limit - credit.credit_balance;
   const creditCoversOrder = availableCredit >= total;
 
@@ -280,7 +288,7 @@ export default function Checkout() {
             <div className="font-heading font-bold text-lg mb-4">Order Summary</div>
             <div className="space-y-3 max-h-64 overflow-y-auto pr-1">
               {items.map((i) => {
-                const price = i.bulk_price && i.quantity >= (i.moq || 1) * 10 ? i.bulk_price : i.price;
+                const price = effectivePrice(i, i.quantity);
                 return (
                   <div key={i.product_id} className="flex gap-3 items-center text-sm">
                     <img src={i.image} alt={i.name} className="w-12 h-12 rounded-lg object-cover" />
@@ -308,7 +316,8 @@ export default function Checkout() {
             <div className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-slate-600">Subtotal</span><span>{formatINR(subtotal)}</span></div>
               {discount > 0 && <div className="flex justify-between text-brand-emerald"><span>Discount</span><span>-{formatINR(discount)}</span></div>}
-              <div className="flex justify-between"><span className="text-slate-600">GST (18%)</span><span>{formatINR(gst)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">CGST</span><span>{formatINR(cgst)}</span></div>
+              <div className="flex justify-between"><span className="text-slate-600">SGST</span><span>{formatINR(sgst)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">Shipping</span><span>{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
               <div className="border-t border-slate-100 pt-3 mt-2 flex justify-between items-center">
                 <span className="text-slate-900 font-semibold">Grand Total</span>

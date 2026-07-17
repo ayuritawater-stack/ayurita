@@ -1,31 +1,48 @@
+import { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
-import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle, Users, Star, Wallet, Undo2, ShieldCheck } from "lucide-react";
+import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle, Users, Star, HelpCircle, Wallet, Undo2, ShieldCheck, BarChart3 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, ownerOnly: true },
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart3, ownerOnly: true },
   { to: "/admin/orders", label: "Orders", icon: ShoppingBag },
   { to: "/admin/products", label: "Products", icon: Package, ownerOnly: true },
   { to: "/admin/categories", label: "Categories", icon: FolderTree, ownerOnly: true },
-  { to: "/admin/bulk-inquiries", label: "Bulk Inquiries", icon: MessagesSquare },
-  { to: "/admin/contact-messages", label: "Contact Messages", icon: Mail },
-  { to: "/admin/reviews", label: "Reviews", icon: Star },
-  { to: "/admin/returns", label: "Returns & Refunds", icon: Undo2 },
+  { to: "/admin/bulk-inquiries", label: "Bulk Inquiries", icon: MessagesSquare, badgeKey: "new_bulk_inquiries" },
+  { to: "/admin/contact-messages", label: "Contact Messages", icon: Mail, badgeKey: "new_contact_messages" },
+  { to: "/admin/reviews", label: "Reviews", icon: Star, badgeKey: "pending_reviews" },
+  { to: "/admin/questions", label: "Questions", icon: HelpCircle, badgeKey: "pending_questions" },
+  { to: "/admin/returns", label: "Returns & Refunds", icon: Undo2, badgeKey: "pending_returns" },
   { to: "/admin/coupons", label: "Coupons", icon: TicketPercent, ownerOnly: true },
-  { to: "/admin/customers", label: "Customers & Credit", icon: Wallet, ownerOnly: true },
+  { to: "/admin/customers", label: "Customers & Credit", icon: Wallet, ownerOnly: true, badgeKey: "pending_credit_requests" },
   { to: "/admin/audit-log", label: "Audit Log", icon: ShieldCheck, ownerOnly: true },
   { to: "/admin/settings", label: "Settings", icon: Droplets, ownerOnly: true },
   { to: "/admin/staff", label: "Staff Accounts", icon: Users, ownerOnly: true },
   { to: "/admin/profile", label: "Profile", icon: UserCircle },
 ];
 
+const NOTIFICATIONS_POLL_MS = 60_000;
+
 export default function AdminLayout() {
   const { admin, logout } = useAuth();
   const nav = useNavigate();
+  const [counts, setCounts] = useState({});
   // Admins created before sub-admin roles existed have no admin_role field - default to owner,
   // matching the backend's require_owner default (see backend/deps.py).
   const isStaff = (admin?.admin_role || "owner") === "staff";
   const visibleNav = NAV.filter((item) => !item.ownerOnly || !isStaff);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = () => {
+      api.get("/admin/notifications").then(({ data }) => { if (!cancelled) setCounts(data); }).catch(() => {});
+    };
+    poll();
+    const id = setInterval(poll, NOTIFICATIONS_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
 
   const onLogout = () => {
     logout();
@@ -61,7 +78,12 @@ export default function AdminLayout() {
               }
             >
               <item.icon className="w-4 h-4" strokeWidth={1.7} />
-              <span>{item.label}</span>
+              <span className="flex-1">{item.label}</span>
+              {item.badgeKey && !!counts[item.badgeKey] && (
+                <span className="min-w-[1.25rem] h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  {counts[item.badgeKey] > 99 ? "99+" : counts[item.badgeKey]}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

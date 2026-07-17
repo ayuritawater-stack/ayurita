@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart, Star } from "lucide-react";
+import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart, Star, HelpCircle } from "lucide-react";
 import { api, formatINR, isCustomerLoggedIn } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
+import { isFlashSaleActive, effectivePrice } from "@/lib/pricing";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import ProductCard from "@/components/ProductCard";
 
 export default function ProductDetail() {
@@ -22,6 +25,10 @@ export default function ProductDetail() {
   const [reviews, setReviews] = useState([]);
   const [reviewForm, setReviewForm] = useState({ rating: 5, comment: "" });
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [questions, setQuestions] = useState([]);
+  const [questionForm, setQuestionForm] = useState({ name: "", question: "" });
+  const [submittingQuestion, setSubmittingQuestion] = useState(false);
+  const [bundleSelected, setBundleSelected] = useState({});
 
   useEffect(() => {
     setLoading(true);
@@ -30,10 +37,15 @@ export default function ProductDetail() {
         setProduct(r.data);
         setQty(r.data.moq || 1);
         setActiveImg(0);
+        const initSel = { [r.data.id]: true };
+        (r.data.frequently_bought_together || []).forEach((p) => { initSel[p.id] = true; });
+        setBundleSelected(initSel);
         const rel = await api.get("/products", { params: { category: r.data.category_id, limit: 4 } });
         setRelated(rel.data.filter((p) => p.id !== r.data.id).slice(0, 3));
         const rev = await api.get(`/products/${r.data.id}/reviews`);
         setReviews(rev.data);
+        const qs = await api.get(`/questions/product/${r.data.id}`);
+        setQuestions(qs.data);
       })
       .catch(() => setProduct(null))
       .finally(() => setLoading(false));
@@ -53,6 +65,20 @@ export default function ProductDetail() {
     }
   };
 
+  const submitQuestion = async (e) => {
+    e.preventDefault();
+    setSubmittingQuestion(true);
+    try {
+      await api.post("/questions", { ...questionForm, product_id: product.id });
+      toast.success("Thanks! Your question will appear here once answered.");
+      setQuestionForm({ name: "", question: "" });
+    } catch (err) {
+      toast.error(err.response?.data?.detail || "Failed to submit question");
+    } finally {
+      setSubmittingQuestion(false);
+    }
+  };
+
   if (loading) {
     return <div className="container-x py-24 text-center text-slate-500">Loading…</div>;
   }
@@ -65,13 +91,25 @@ export default function ProductDetail() {
     );
   }
 
-  const unitPrice = product.bulk_price && qty >= (product.moq || 1) * 10 ? product.bulk_price : product.price;
+  const onSale = isFlashSaleActive(product);
+  const unitPrice = effectivePrice(product, qty);
   const gstAmount = (unitPrice * qty) * (product.gst_rate / 100);
   const grandTotal = (unitPrice * qty) + gstAmount;
 
   const onAdd = () => {
     addItem(product, qty);
     toast.success(`${product.name} added to cart`, { description: `Quantity: ${qty}` });
+  };
+
+  const bundleItems = [product, ...(product.frequently_bought_together || [])];
+  const toggleBundleItem = (id) => setBundleSelected((s) => ({ ...s, [id]: !s[id] }));
+  const bundleTotal = bundleItems
+    .filter((p) => bundleSelected[p.id])
+    .reduce((sum, p) => sum + effectivePrice(p, p.moq || 1) * (p.moq || 1), 0);
+  const addBundleToCart = () => {
+    const chosen = bundleItems.filter((p) => bundleSelected[p.id]);
+    chosen.forEach((p) => addItem(p, p.moq || 1));
+    toast.success(`${chosen.length} item(s) added to cart`);
   };
 
   const whatsappUrl = `https://wa.me/${BUSINESS.whatsapp}?text=${encodeURIComponent(
@@ -131,6 +169,7 @@ export default function ProductDetail() {
             <div className="flex flex-wrap gap-2 mt-4">
               <span className="chip">{product.size}</span>
               {product.featured && <span className="chip !bg-emerald-50 !text-brand-emerald">Featured</span>}
+              {onSale && <span className="chip !bg-rose-500 !text-white">Flash Sale</span>}
               <span className={`chip ${product.stock > 0 ? "!bg-emerald-50 !text-brand-emerald" : "!bg-rose-50 !text-rose-600"}`}>
                 {product.stock > 0 ? "In Stock" : "Out of Stock"}
               </span>
@@ -139,8 +178,8 @@ export default function ProductDetail() {
             <div className="mt-6 pb-6 border-b border-slate-100">
               <div className="text-xs text-slate-500 uppercase tracking-wider">Unit Price</div>
               <div className="flex items-end gap-3 mt-1">
-                <div className="text-4xl font-heading font-bold text-slate-900" data-testid="product-price">{formatINR(unitPrice)}</div>
-                {product.bulk_price && product.bulk_price < product.price && (
+                <div className={`text-4xl font-heading font-bold ${onSale ? "text-rose-600" : "text-slate-900"}`} data-testid="product-price">{formatINR(unitPrice)}</div>
+                {(onSale || (product.bulk_price && product.bulk_price < product.price)) && (
                   <div className="text-sm text-slate-400 line-through pb-1">{formatINR(product.price)}</div>
                 )}
                 <div className="text-sm text-slate-500 pb-1">/ unit</div>
@@ -299,6 +338,97 @@ export default function ProductDetail() {
             </div>
           )}
         </div>
+
+        {/* Q&A */}
+        <div className="mt-24 max-w-3xl">
+          <div className="flex items-center justify-between gap-4 mb-8">
+            <h2 className="h-section mb-0">Questions &amp; Answers</h2>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="btn-secondary" data-testid="open-question-dialog">
+                  <HelpCircle className="w-4 h-4" /> Ask a Question
+                </button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Ask a Question</DialogTitle></DialogHeader>
+                <form onSubmit={submitQuestion} className="space-y-3">
+                  <Input
+                    required
+                    placeholder="Your name"
+                    value={questionForm.name}
+                    onChange={(e) => setQuestionForm({ ...questionForm, name: e.target.value })}
+                    className="rounded-xl"
+                    data-testid="question-name-input"
+                  />
+                  <textarea
+                    required
+                    placeholder="What would you like to know about this product?"
+                    rows={4}
+                    value={questionForm.question}
+                    onChange={(e) => setQuestionForm({ ...questionForm, question: e.target.value })}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm"
+                    data-testid="question-text-input"
+                  />
+                  <button type="submit" className="btn-primary w-full justify-center" disabled={submittingQuestion} data-testid="submit-question-button">
+                    {submittingQuestion ? "Submitting…" : "Submit Question"}
+                  </button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {questions.length === 0 ? (
+            <p className="text-sm text-slate-500">No questions yet. Ask us anything about this product!</p>
+          ) : (
+            <div className="space-y-4">
+              {questions.map((q) => (
+                <div key={q.id} className="border-b border-slate-100 pb-4" data-testid={`question-${q.id}`}>
+                  <div className="flex items-start gap-2">
+                    <HelpCircle className="w-4 h-4 mt-0.5 text-brand-primary shrink-0" />
+                    <div className="text-sm font-semibold text-slate-900">{q.question}</div>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1 ml-6">— {q.name}</div>
+                  {q.answer && <p className="text-sm text-slate-600 mt-2 ml-6 border-l-2 border-brand-primary/30 pl-3">{q.answer}</p>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Frequently bought together */}
+        {product.frequently_bought_together?.length > 0 && (
+          <div className="mt-24">
+            <h2 className="h-section mb-8">Frequently Bought Together</h2>
+            <div className="card-premium p-5">
+              <div className="flex flex-wrap items-stretch gap-3">
+                {bundleItems.map((p, i) => (
+                  <div key={p.id} className="flex items-center gap-2">
+                    <label className="flex items-center gap-2 border border-slate-200 rounded-xl p-2 cursor-pointer min-w-[9rem]">
+                      <input
+                        type="checkbox"
+                        checked={!!bundleSelected[p.id]}
+                        onChange={() => toggleBundleItem(p.id)}
+                        data-testid={`bundle-item-${p.id}`}
+                      />
+                      <img src={p.images?.[0]} alt={p.name} className="h-12 w-12 rounded-lg object-cover bg-slate-100" />
+                      <div className="min-w-0">
+                        <div className="text-xs text-slate-700 line-clamp-2">{p.name}{p.id === product.id ? " (this item)" : ""}</div>
+                        <div className="text-xs font-semibold text-slate-900">{formatINR(effectivePrice(p, p.moq || 1))}</div>
+                      </div>
+                    </label>
+                    {i < bundleItems.length - 1 && <div className="text-slate-400 font-bold">+</div>}
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex items-center justify-between flex-wrap gap-3 pt-4 border-t border-slate-100">
+                <div className="text-sm text-slate-600">Total for selected: <span className="font-heading font-bold text-lg text-slate-900">{formatINR(bundleTotal)}</span></div>
+                <button onClick={addBundleToCart} className="btn-primary" data-testid="add-bundle-to-cart">
+                  <ShoppingCart className="w-4 h-4" /> Add Selected to Cart
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Related */}
         {related.length > 0 && (

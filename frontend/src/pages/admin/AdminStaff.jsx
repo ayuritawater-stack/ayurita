@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Users, Plus, Trash2 } from "lucide-react";
+import { Users, Plus, Trash2, Edit3, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
@@ -10,8 +10,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 
 const emptyForm = { email: "", password: "", name: "", admin_role: "staff" };
+const emptyEditForm = { name: "", email: "", password: "" };
 
-const errorMessage = (err, fallback) => err.response?.data?.detail || fallback;
+const errorMessage = (err, fallback) => {
+  const detail = err.response?.data?.detail;
+  if (Array.isArray(detail)) return detail.map((d) => d.msg || JSON.stringify(d)).join("; ") || fallback;
+  return detail || fallback;
+};
 
 export default function AdminStaff() {
   const { admin } = useAuth();
@@ -20,6 +25,9 @@ export default function AdminStaff() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -62,6 +70,28 @@ export default function AdminStaff() {
       toast.success("Role updated");
     } catch (err) {
       toast.error(errorMessage(err, "Failed to update role"));
+    }
+  };
+
+  const startEdit = (s) => {
+    setEditingId(s.id);
+    setEditForm({ name: s.name, email: s.email, password: "" });
+  };
+
+  const saveEdit = async (e) => {
+    e.preventDefault();
+    setSavingEdit(true);
+    try {
+      const payload = { name: editForm.name, email: editForm.email };
+      if (editForm.password) payload.password = editForm.password;
+      const { data } = await api.put(`/admin/staff/${editingId}`, payload);
+      setStaff((prev) => prev.map((s) => (s.id === editingId ? { ...s, ...data } : s)));
+      toast.success("Account updated");
+      setEditingId(null);
+    } catch (err) {
+      toast.error(errorMessage(err, "Failed to update account"));
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -132,30 +162,60 @@ export default function AdminStaff() {
         ) : (
           <div className="divide-y divide-slate-100">
             {staff.map((s) => (
-              <div key={s.id} className="py-3 flex items-center gap-4" data-testid={`staff-row-${s.id}`}>
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-semibold text-slate-900 truncate">{s.name}</div>
-                  <div className="text-xs text-slate-500 truncate">{s.email}</div>
+              <div key={s.id} data-testid={`staff-row-${s.id}`}>
+                <div className="py-3 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-slate-900 truncate">{s.name}</div>
+                    <div className="text-xs text-slate-500 truncate">{s.email}</div>
+                  </div>
+                  <Badge variant="outline" className={s.admin_role === "owner" ? "!bg-sky-50 !text-brand-primary" : "!bg-slate-50 !text-slate-600"}>
+                    {s.admin_role === "owner" ? "Owner" : "Staff"}
+                  </Badge>
+                  <Select value={s.admin_role} onValueChange={(v) => changeRole(s.id, v)} disabled={s.id === admin?.id}>
+                    <SelectTrigger className="w-32 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="staff">Staff</SelectItem>
+                      <SelectItem value="owner">Owner</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <button
+                    onClick={() => (editingId === s.id ? setEditingId(null) : startEdit(s))}
+                    className="w-9 h-9 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition"
+                    aria-label="Edit admin"
+                    data-testid={`edit-staff-${s.id}`}
+                  >
+                    {editingId === s.id ? <X className="w-4 h-4" /> : <Edit3 className="w-4 h-4" />}
+                  </button>
+                  <button
+                    onClick={() => removeStaff(s.id)}
+                    disabled={s.id === admin?.id}
+                    className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition disabled:opacity-40"
+                    aria-label="Remove admin"
+                    data-testid={`remove-staff-${s.id}`}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <Badge variant="outline" className={s.admin_role === "owner" ? "!bg-sky-50 !text-brand-primary" : "!bg-slate-50 !text-slate-600"}>
-                  {s.admin_role === "owner" ? "Owner" : "Staff"}
-                </Badge>
-                <Select value={s.admin_role} onValueChange={(v) => changeRole(s.id, v)} disabled={s.id === admin?.id}>
-                  <SelectTrigger className="w-32 rounded-xl"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="staff">Staff</SelectItem>
-                    <SelectItem value="owner">Owner</SelectItem>
-                  </SelectContent>
-                </Select>
-                <button
-                  onClick={() => removeStaff(s.id)}
-                  disabled={s.id === admin?.id}
-                  className="w-9 h-9 rounded-lg bg-rose-50 text-rose-500 hover:bg-rose-100 flex items-center justify-center transition disabled:opacity-40"
-                  aria-label="Remove admin"
-                  data-testid={`remove-staff-${s.id}`}
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
+                {editingId === s.id && (
+                  <form onSubmit={saveEdit} className="pb-4 grid gap-3 md:grid-cols-3" data-testid={`edit-staff-form-${s.id}`}>
+                    <div>
+                      <Label className="text-xs text-slate-500">Name</Label>
+                      <Input required value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} className="mt-1 rounded-xl" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500">Email</Label>
+                      <Input required type="email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} className="mt-1 rounded-xl" />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500">New Password (optional)</Label>
+                      <PasswordInput autoComplete="new-password" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} className="mt-1 rounded-xl" placeholder="Leave blank to keep current" />
+                    </div>
+                    <div className="md:col-span-3 flex justify-end gap-2">
+                      <button type="button" className="btn-secondary !py-2" onClick={() => setEditingId(null)}>Cancel</button>
+                      <button type="submit" className="btn-primary !py-2" disabled={savingEdit}>{savingEdit ? "Saving…" : "Save Changes"}</button>
+                    </div>
+                  </form>
+                )}
               </div>
             ))}
           </div>

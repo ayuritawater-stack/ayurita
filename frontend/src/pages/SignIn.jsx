@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { LockKeyhole } from "lucide-react";
 import { api } from "@/lib/api";
+import { useWishlist } from "@/lib/wishlist";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -10,6 +11,7 @@ import { Label } from "@/components/ui/label";
 export default function SignIn() {
   const nav = useNavigate();
   const loc = useLocation();
+  const { syncAfterLogin } = useWishlist();
   const [form, setForm] = useState({ email: "", password: "" });
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +27,7 @@ export default function SignIn() {
       localStorage.setItem("ayurita_customer_token", data.token);
       localStorage.setItem("ayurita_customer_business_name", data.business_name);
       localStorage.setItem("ayurita_customer_email", data.email);
+      syncAfterLogin();
       toast.success(`Welcome back, ${data.business_name}!`);
       nav(loc.state?.from?.pathname || "/account", { replace: true, state: loc.state?.from?.state });
     } catch (err) {
@@ -53,6 +56,9 @@ export default function SignIn() {
             <div>
               <Label className="text-xs text-slate-500">Password</Label>
               <PasswordInput required autoComplete="off" value={form.password} onChange={(e) => setForm((f) => ({ ...f, password: e.target.value }))} data-testid="signin-password-input" />
+              <div className="text-right mt-1">
+                <Link to="/forgot-password" className="text-xs text-brand-primary hover:underline" data-testid="signin-forgot-password-link">Forgot password?</Link>
+              </div>
             </div>
             <button type="submit" className="btn-primary w-full justify-center" disabled={loading} data-testid="signin-submit">
               {loading ? "Signing in..." : "Sign in"}

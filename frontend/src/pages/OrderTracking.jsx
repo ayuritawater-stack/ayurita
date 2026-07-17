@@ -199,6 +199,16 @@ export default function OrderTracking() {
                     <span>Discount</span><span>-{formatINR(order.discount)}</span>
                   </div>
                 )}
+                {order.cgst_total > 0 && (
+                  <div className="flex justify-between text-slate-700">
+                    <span>CGST</span><span>{formatINR(order.cgst_total)}</span>
+                  </div>
+                )}
+                {order.sgst_total > 0 && (
+                  <div className="flex justify-between text-slate-700">
+                    <span>SGST</span><span>{formatINR(order.sgst_total)}</span>
+                  </div>
+                )}
                 {order.shipping > 0 && (
                   <div className="flex justify-between text-slate-700">
                     <span>Shipping</span><span>{formatINR(order.shipping)}</span>

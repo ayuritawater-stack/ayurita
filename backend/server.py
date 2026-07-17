@@ -6,7 +6,7 @@ from fastapi import FastAPI, APIRouter, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
-from deps import client
+from deps import client, db
 from seed import run_seed
 from security import SecureHeadersMiddleware
 from services.credit_reminders import send_due_reminders
@@ -25,6 +25,7 @@ from routers import customer as r_customer
 from routers import payments as r_payments
 from routers import admins as r_admins
 from routers import reviews as r_reviews
+from routers import questions as r_questions
 from routers import credit as r_credit
 from routers import returns as r_returns
 
@@ -57,7 +58,9 @@ api.include_router(r_customer.router)
 api.include_router(r_payments.router)
 api.include_router(r_admins.router)
 api.include_router(r_admins.audit_router)
+api.include_router(r_admins.notifications_router)
 api.include_router(r_reviews.router)
+api.include_router(r_questions.router)
 api.include_router(r_credit.router)
 api.include_router(r_credit.requests_router)
 api.include_router(r_credit.reminders_router)
@@ -95,6 +98,44 @@ async def _unhandled_exception_handler(request: Request, exc: Exception):
     return JSONResponse(status_code=500, content={"detail": "Something went wrong. Please try again."})
 
 
+async def _create_index_safely(collection, *args, **kwargs) -> None:
+    """A single bad index (e.g. a unique index that can't build because existing data already
+    has duplicates) must not take down the rest of startup - each index attempt is isolated so
+    one failure doesn't skip the ones after it or the credit-reminder loop starting."""
+    try:
+        await collection.create_index(*args, **kwargs)
+    except Exception:
+        logger.exception("Failed to create index %s on %s", args, collection.name)
+
+
+async def _create_indexes() -> None:
+    # Uniqueness / lookup indexes.
+    await _create_index_safely(db.products, "slug", unique=True)
+    await _create_index_safely(db.categories, "slug", unique=True)
+    await _create_index_safely(db.coupons, "code", unique=True)
+    await _create_index_safely(db.customers, "email", unique=True)
+    await _create_index_safely(db.customers, "phone", unique=True)
+    await _create_index_safely(db.admins, "email", unique=True)
+    await _create_index_safely(db.orders, "order_number", unique=True)
+    await _create_index_safely(db.orders, "customer_id")
+    # Admin panel status filters, sidebar notification-count polling, and Analytics date-range
+    # queries - without these, each is a full collection scan that gets slower as data grows and
+    # can drag down the whole admin panel on a shared/free-tier DB.
+    await _create_index_safely(db.orders, "status")
+    await _create_index_safely(db.orders, [("created_at", -1)])
+    await _create_index_safely(db.products, [("is_active", 1), ("stock", 1)])
+    await _create_index_safely(db.reviews, "product_id")
+    await _create_index_safely(db.reviews, "status")
+    await _create_index_safely(db.questions, "product_id")
+    await _create_index_safely(db.questions, "answered")
+    await _create_index_safely(db.return_requests, "status")
+    await _create_index_safely(db.return_requests, "order_id")
+    await _create_index_safely(db.credit_requests, "status")
+    await _create_index_safely(db.bulk_inquiries, "status")
+    await _create_index_safely(db.contact_messages, [("created_at", -1)])
+    await _create_index_safely(db.audit_logs, [("timestamp", -1)])
+
+
 async def _credit_reminder_loop():
     while True:
         try:
@@ -112,6 +153,7 @@ async def _startup():
         await run_seed()
     except Exception as exc:
         logger.warning("Startup seeding skipped: %s", exc)
+    await _create_indexes()
     asyncio.create_task(_credit_reminder_loop())
 
 
