@@ -13,6 +13,11 @@ from services.delivery import calculate_delivery_charge, verify_indian_pincode
 
 router = APIRouter(tags=["delivery"])
 
+# Begusarai district pincodes all start with this prefix (e.g. 851101, 851129) - our only
+# service area. Used as a static backstop when the India Post lookup is unreachable, since
+# checkout's City/State fields are free text and can't be trusted to confirm the address alone.
+BEGUSARAI_PINCODE_PREFIX = "851"
+
 
 @router.post("/delivery/estimate")
 async def estimate_delivery(body: DeliveryEstimateIn, request: Request):
@@ -28,8 +33,10 @@ async def check_pincode(request: Request, pincode: str = Path(min_length=6, max_
         raise HTTPException(status_code=400, detail="Pincode must be 6 digits")
     info = await verify_indian_pincode(pincode)
     if info is None:
-        # Lookup unavailable - fail open so a third-party API outage never blocks checkout.
-        return {"valid": True, "checked": False}
+        # Lookup unavailable - fall back to the static Begusarai-prefix check rather than
+        # blindly failing open, so a third-party outage can't be used to smuggle through an
+        # out-of-area order.
+        return {"valid": pincode.startswith(BEGUSARAI_PINCODE_PREFIX), "checked": False}
     if not info["found"]:
         return {"valid": False, "checked": True}
     return {"valid": True, "checked": True, "city": info.get("city", ""), "state": info.get("state", "")}

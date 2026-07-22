@@ -139,11 +139,14 @@ export default function Checkout() {
       try {
         const { data } = await api.get(`/pincode/${form.pincode}/verify`);
         if (cancelled) return;
-        if (!data.checked) { setPincodeValid(true); return; }
+        // When the India Post lookup itself failed, the backend already falls back to a static
+        // Begusarai-prefix check (data.valid) rather than blindly passing everything.
+        if (!data.checked) { setPincodeValid(data.valid); return; }
         const inBegusarai = data.valid && (data.city || "").trim().toLowerCase().includes("begusarai");
         setPincodeValid(inBegusarai);
       } catch (err) {
-        if (!cancelled) setPincodeValid(true);
+        // Couldn't even reach our backend - fall back to the same prefix check client-side.
+        if (!cancelled) setPincodeValid(form.pincode.startsWith("851"));
       }
     }, 500);
     return () => { cancelled = true; clearTimeout(t); };
