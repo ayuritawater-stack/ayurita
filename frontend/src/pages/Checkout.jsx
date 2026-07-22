@@ -125,8 +125,10 @@ export default function Checkout() {
     return () => clearTimeout(t);
   }, [form.address, form.city, form.state, form.pincode]);
 
-  // Verify the pincode actually exists (via India Post lookup on the backend) rather than just
-  // checking it's 6 digits - best-effort, fails open if the lookup itself is unavailable.
+  // Verify the pincode actually exists AND falls within Begusarai (via India Post lookup on the
+  // backend) rather than just checking it's 6 digits - best-effort, fails open if the lookup
+  // itself is unavailable (we only have a service area of one city, so any pincode we can't
+  // place is treated as out-of-area rather than merely "doesn't exist").
   useEffect(() => {
     if (form.pincode.length !== 6) {
       setPincodeValid(null);
@@ -136,13 +138,24 @@ export default function Checkout() {
     const t = setTimeout(async () => {
       try {
         const { data } = await api.get(`/pincode/${form.pincode}/verify`);
-        if (!cancelled) setPincodeValid(data.valid);
+        if (cancelled) return;
+        if (!data.checked) { setPincodeValid(true); return; }
+        const inBegusarai = data.valid && (data.city || "").trim().toLowerCase().includes("begusarai");
+        setPincodeValid(inBegusarai);
       } catch (err) {
         if (!cancelled) setPincodeValid(true);
       }
     }, 500);
     return () => { cancelled = true; clearTimeout(t); };
   }, [form.pincode]);
+
+  // City/State are free-text but we only serve Begusarai, Bihar - flag a mismatch as soon as the
+  // customer leaves the field rather than only failing at submit.
+  const checkCityState = () => {
+    if (form.city.trim().toLowerCase() !== "begusarai" || form.state.trim().toLowerCase() !== "bihar") {
+      toast.error("Delivery is available in Begusarai only");
+    }
+  };
 
   const applyCoupon = async () => {
     if (!coupon) return;
@@ -175,8 +188,11 @@ export default function Checkout() {
   const placeOrder = async (e) => {
     e.preventDefault();
     if (items.length === 0) return toast.error("Your cart is empty");
+    if (form.city.trim().toLowerCase() !== "begusarai" || form.state.trim().toLowerCase() !== "bihar") {
+      return toast.error("Delivery is available in Begusarai only");
+    }
     if (!form.pincode || form.pincode.length !== 6) return toast.error("Enter a valid pincode");
-    if (pincodeValid === false) return toast.error("Enter a valid pincode — this pincode does not exist");
+    if (pincodeValid === false) return toast.error("Invalid pincode — delivery is available in Begusarai only");
     if (deliveryBlocked) return toast.error(deliveryEstimate.reason || "Delivery is not available at this address");
     setSubmitting(true);
 
@@ -294,11 +310,11 @@ export default function Checkout() {
                 </div>
                 <div>
                   <Label>City *</Label>
-                  <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} className="mt-1.5 rounded-xl" />
+                  <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" />
                 </div>
                 <div>
                   <Label>State *</Label>
-                  <Input required data-testid="checkout-state" value={form.state} onChange={(e) => set("state", e.target.value)} className="mt-1.5 rounded-xl" />
+                  <Input required data-testid="checkout-state" value={form.state} onChange={(e) => set("state", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" />
                 </div>
                 <div>
                   <Label>Pincode *</Label>
@@ -312,7 +328,7 @@ export default function Checkout() {
                     className="mt-1.5 rounded-xl"
                     aria-invalid={pincodeValid === false}
                   />
-                  {pincodeValid === false && <div className="text-xs text-rose-600 mt-1">This pincode does not exist</div>}
+                  {pincodeValid === false && <div className="text-xs text-rose-600 mt-1">Invalid pincode — delivery is available in Begusarai only</div>}
                 </div>
                 {addresses.length > 0 && (
                   <div className="md:col-span-2">
