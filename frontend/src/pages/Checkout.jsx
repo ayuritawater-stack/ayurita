@@ -24,6 +24,18 @@ const loadRazorpayScript = () =>
     document.body.appendChild(script);
   });
 
+// FastAPI validation errors arrive as detail: [{ loc: [...], msg, type }, ...] rather than a
+// plain string - render the first error's field + message instead of dumping the raw array.
+const getErrorMessage = (err, fallback) => {
+  const detail = err.response?.data?.detail;
+  if (Array.isArray(detail) && detail.length > 0) {
+    const first = detail[0];
+    const field = Array.isArray(first.loc) ? first.loc[first.loc.length - 1] : "Value";
+    return `${field}: ${first.msg}`;
+  }
+  return detail || fallback;
+};
+
 export default function Checkout() {
   const nav = useNavigate();
   const { shippingFlat, freeShippingAbove } = useSettings();
@@ -167,10 +179,20 @@ export default function Checkout() {
     if (pincodeValid === false) return toast.error("Enter a valid pincode — this pincode does not exist");
     if (deliveryBlocked) return toast.error(deliveryEstimate.reason || "Delivery is not available at this address");
     setSubmitting(true);
+
+    let normalizedPhone = form.phone.replace(/\D/g, "");
+    if (normalizedPhone.startsWith("0")) normalizedPhone = normalizedPhone.slice(1);
+    if (normalizedPhone.length === 12 && normalizedPhone.startsWith("91")) normalizedPhone = normalizedPhone.slice(2);
+    if (!/^[6-9]\d{9}$/.test(normalizedPhone)) {
+      setSubmitting(false);
+      toast.error("Enter a valid 10-digit Indian mobile number");
+      return;
+    }
+
     try {
       const payload = {
         items: items.map((i) => ({ product_id: i.product_id, quantity: i.quantity })),
-        guest: form,
+        guest: { ...form, phone: normalizedPhone },
         coupon_code: couponData ? couponData.code : null,
         payment_method: payment,
       };
@@ -207,7 +229,7 @@ export default function Checkout() {
               toast.success("Payment successful! Order placed.");
               nav(`/order-success/${data.order_number}`);
             } catch (err) {
-              toast.error(err.response?.data?.detail || "Payment verification failed");
+              toast.error(getErrorMessage(err, "Payment verification failed"));
             } finally {
               setSubmitting(false);
             }
@@ -225,7 +247,7 @@ export default function Checkout() {
       nav(`/order-success/${data.order_number}`);
       setSubmitting(false);
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Failed to place order");
+      toast.error(getErrorMessage(err, "Failed to place order"));
       setSubmitting(false);
     }
   };
