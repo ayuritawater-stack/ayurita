@@ -63,6 +63,9 @@ export default function Checkout() {
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [pincodeValid, setPincodeValid] = useState(null);
   const deliveryBlocked = !!(deliveryEstimate && deliveryEstimate.delivery_allowed === false);
+  const cityStateValid = form.city.trim().toLowerCase() === "begusarai" && form.state.trim().toLowerCase() === "bihar";
+  const pincodeComplete = form.pincode.length === 6;
+  const canPlaceOrder = cityStateValid && pincodeComplete && pincodeValid !== false && !deliveryBlocked;
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -104,7 +107,7 @@ export default function Checkout() {
   // the "we don't deliver there" rejection) before submitting, not after. Debounced and
   // best-effort - a failed/slow estimate call must never block the checkout page itself.
   useEffect(() => {
-    if (!form.address || !form.city || form.pincode.length !== 6) {
+    if (!form.address || !form.city || form.pincode.length !== 6 || !cityStateValid || pincodeValid === false) {
       setDeliveryEstimate(null);
       setCheckingDelivery(false);
       return;
@@ -123,7 +126,7 @@ export default function Checkout() {
       }
     }, 700);
     return () => clearTimeout(t);
-  }, [form.address, form.city, form.state, form.pincode]);
+  }, [form.address, form.city, form.state, form.pincode, cityStateValid, pincodeValid]);
 
   // Verify the pincode actually exists AND falls within Begusarai (via India Post lookup on the
   // backend) rather than just checking it's 6 digits - best-effort, fails open if the lookup
@@ -313,11 +316,13 @@ export default function Checkout() {
                 </div>
                 <div>
                   <Label>City *</Label>
-                  <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" />
+                  <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" aria-invalid={!cityStateValid} />
+                  {!cityStateValid && <div className="text-xs text-rose-600 mt-1">Delivery is available in Begusarai only</div>}
                 </div>
                 <div>
                   <Label>State *</Label>
-                  <Input required data-testid="checkout-state" value={form.state} onChange={(e) => set("state", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" />
+                  <Input required data-testid="checkout-state" value={form.state} onChange={(e) => set("state", e.target.value)} onBlur={checkCityState} className="mt-1.5 rounded-xl" aria-invalid={!cityStateValid} />
+                  {!cityStateValid && <div className="text-xs text-rose-600 mt-1">Delivery is available in Begusarai only</div>}
                 </div>
                 <div>
                   <Label>Pincode *</Label>
@@ -359,7 +364,7 @@ export default function Checkout() {
               </div>
               {checkingDelivery && <div className="mt-3 text-xs text-slate-500">Checking delivery availability…</div>}
               {deliveryBlocked && <div className="mt-3 text-sm text-rose-600">{deliveryEstimate.reason}</div>}
-              {!checkingDelivery && deliveryEstimate && deliveryEstimate.delivery_allowed && (
+              {!checkingDelivery && pincodeValid !== false && cityStateValid && deliveryEstimate && deliveryEstimate.delivery_allowed && (
                 <div className="mt-3 text-xs text-brand-emerald">
                   Delivery available{deliveryEstimate.distance_km ? ` · ${deliveryEstimate.distance_km} km away` : ""}
                 </div>
@@ -449,7 +454,7 @@ export default function Checkout() {
               </div>
             </div>
 
-            <button type="submit" disabled={submitting || deliveryBlocked} className="btn-primary w-full mt-6 disabled:opacity-60" data-testid="place-order-btn">
+            <button type="submit" disabled={submitting || !canPlaceOrder} className="btn-primary w-full mt-6 disabled:opacity-60" data-testid="place-order-btn">
               {submitting ? (payment === "online" ? "Processing payment…" : "Placing…") : payment === "online" ? "Pay Now" : "Place Order"} <ArrowRight className="w-4 h-4" />
             </button>
           </aside>
