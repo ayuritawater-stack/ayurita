@@ -54,6 +54,10 @@ async def _geocode_address(full_address: str) -> Optional[Dict[str, Any]]:
         )
         data = resp.json()
         if data.get("status") != "OK" or not data.get("results"):
+            logger.warning(
+                "Geocoding API returned non-OK status for address %r: status=%s error_message=%s",
+                full_address, data.get("status"), data.get("error_message"),
+            )
             return None
         result = data["results"][0]
         loc = result["geometry"]["location"]
@@ -88,9 +92,14 @@ async def _driving_distance_km(origin_lat: float, origin_lng: float, dest_lat: f
         )
         data = resp.json()
         if data.get("status") != "OK":
+            logger.warning(
+                "Distance Matrix API returned non-OK status: status=%s error_message=%s",
+                data.get("status"), data.get("error_message"),
+            )
             return None
         element = data["rows"][0]["elements"][0]
         if element.get("status") != "OK":
+            logger.warning("Distance Matrix API element status not OK: %s", element.get("status"))
             return None
         return element["distance"]["value"] / 1000.0
     except Exception:
