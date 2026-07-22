@@ -28,6 +28,7 @@ export default function Products() {
     if (size) params.size = size;
     if (inStock) params.in_stock = true;
     api.get("/products", { params }).then((r) => setProducts(r.data)).finally(() => setLoading(false));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, [q, cat, size, inStock]);
 
   const total = products.length;

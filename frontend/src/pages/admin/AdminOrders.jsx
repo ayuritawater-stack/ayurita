@@ -256,7 +256,7 @@ export default function AdminOrders() {
                   <div className="flex gap-2"><User className="w-4 h-4 text-slate-400 shrink-0" /><span>{detail.guest?.business_name} · {detail.guest?.contact_person}</span></div>
                   <div className="flex gap-2"><Phone className="w-4 h-4 text-slate-400 shrink-0" /><a href={`tel:${detail.guest?.phone}`}>{detail.guest?.phone}</a></div>
                   <div className="flex gap-2"><Mail className="w-4 h-4 text-slate-400 shrink-0" /><a href={`mailto:${detail.guest?.email}`}>{detail.guest?.email}</a></div>
-                  <div className="flex gap-2"><MapPin className="w-4 h-4 text-slate-400 shrink-0" /><span>{detail.guest?.address}, {detail.guest?.city}</span></div>
+                  <div className="flex gap-2"><MapPin className="w-4 h-4 text-slate-400 shrink-0" /><span>{detail.guest?.address}, {detail.guest?.city}{detail.guest?.state ? `, ${detail.guest.state}` : ""}{detail.guest?.pincode ? ` - ${detail.guest.pincode}` : ""}</span></div>
                   {detail.guest?.gst_number && <div className="text-xs text-slate-500">GST: {detail.guest.gst_number}</div>}
                   {detail.guest?.notes && <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">Notes: {detail.guest.notes}</div>}
                 </div>
@@ -281,7 +281,7 @@ export default function AdminOrders() {
                 {detail.discount > 0 && <div className="flex justify-between text-brand-emerald"><span>Discount</span><span>-{formatINR(detail.discount)}</span></div>}
                 <div className="flex justify-between"><span className="text-slate-600">CGST</span><span>{formatINR(detail.cgst_total ?? detail.gst_total / 2)}</span></div>
                 <div className="flex justify-between"><span className="text-slate-600">SGST</span><span>{formatINR(detail.sgst_total ?? detail.gst_total / 2)}</span></div>
-                <div className="flex justify-between"><span className="text-slate-600">Shipping</span><span>{formatINR(detail.shipping)}</span></div>
+                <div className="flex justify-between"><span className="text-slate-600">Shipping{detail.distance_km ? ` (${detail.distance_km} km)` : ""}</span><span>{formatINR(detail.shipping)}</span></div>
                 <div className="flex justify-between pt-2 border-t border-slate-100">
                   <span className="font-semibold">Grand Total</span>
                   <span className="font-heading font-bold text-lg">{formatINR(detail.grand_total)}</span>

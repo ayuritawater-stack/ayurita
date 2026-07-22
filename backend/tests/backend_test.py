@@ -234,7 +234,7 @@ class TestOrders:
         return {
             "business_name": "TEST_Biz", "contact_person": "John Test",
             "phone": "9999999999", "email": "test@example.com",
-            "address": "1 Test Rd", "city": "Begusarai",
+            "address": "1 Test Rd", "city": "Begusarai", "state": "Bihar", "pincode": "851101",
             "gst_number": "22AAAAA0000A1Z5", "notes": "test order",
         }
 
@@ -340,7 +340,7 @@ class TestPublicInvoicePDF:
             "guest": {
                 "business_name": "TEST_PublicInvoiceCo", "contact_person": "Pub Inv Test",
                 "phone": "9111111112", "email": "pubinv@example.com",
-                "address": "42 Public Rd", "city": "Begusarai",
+                "address": "42 Public Rd", "city": "Begusarai", "state": "Bihar", "pincode": "851101",
                 "gst_number": "10ABCDE1234F1Z5",
             },
             "payment_method": "cod",
@@ -367,7 +367,7 @@ class TestInvoicePDF:
             "guest": {
                 "business_name": "TEST_InvoiceCo", "contact_person": "Inv Test",
                 "phone": "9111111111", "email": "inv@example.com",
-                "address": "42 Invoice Rd", "city": "Begusarai",
+                "address": "42 Invoice Rd", "city": "Begusarai", "state": "Bihar", "pincode": "851101",
                 "gst_number": "10ABCDE1234F1Z5",
             },
             "payment_method": "cod",

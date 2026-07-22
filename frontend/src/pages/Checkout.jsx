@@ -42,9 +42,15 @@ export default function Checkout() {
     email: "",
     address: "",
     city: "Begusarai",
+    state: "Bihar",
+    pincode: "",
     gst_number: "",
     notes: "",
   });
+  const [deliveryEstimate, setDeliveryEstimate] = useState(null);
+  const [checkingDelivery, setCheckingDelivery] = useState(false);
+  const [pincodeValid, setPincodeValid] = useState(null);
+  const deliveryBlocked = !!(deliveryEstimate && deliveryEstimate.delivery_allowed === false);
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -71,7 +77,7 @@ export default function Checkout() {
       const def = data.find((a) => a.is_default) || data[0];
       if (def) {
         setSelectedAddressId(def.id);
-        setForm((f) => ({ ...f, address: def.address, city: def.city, gst_number: def.gst_number || f.gst_number }));
+        setForm((f) => ({ ...f, address: def.address, city: def.city, state: def.state || f.state, pincode: def.pincode || f.pincode, gst_number: def.gst_number || f.gst_number }));
       }
     }).catch(() => {});
   }, []);
@@ -79,8 +85,52 @@ export default function Checkout() {
   const selectAddress = (id) => {
     setSelectedAddressId(id);
     const a = addresses.find((x) => x.id === id);
-    if (a) setForm((f) => ({ ...f, address: a.address, city: a.city, gst_number: a.gst_number || f.gst_number }));
+    if (a) setForm((f) => ({ ...f, address: a.address, city: a.city, state: a.state || f.state, pincode: a.pincode || f.pincode, gst_number: a.gst_number || f.gst_number }));
   };
+
+  // Live delivery-charge check as the address is filled in, so a customer sees the charge (or
+  // the "we don't deliver there" rejection) before submitting, not after. Debounced and
+  // best-effort - a failed/slow estimate call must never block the checkout page itself.
+  useEffect(() => {
+    if (!form.address || !form.city || form.pincode.length !== 6) {
+      setDeliveryEstimate(null);
+      setCheckingDelivery(false);
+      return;
+    }
+    setCheckingDelivery(true);
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.post("/delivery/estimate", {
+          address: form.address, city: form.city, state: form.state, pincode: form.pincode,
+        });
+        setDeliveryEstimate(data);
+      } catch (err) {
+        setDeliveryEstimate(null);
+      } finally {
+        setCheckingDelivery(false);
+      }
+    }, 700);
+    return () => clearTimeout(t);
+  }, [form.address, form.city, form.state, form.pincode]);
+
+  // Verify the pincode actually exists (via India Post lookup on the backend) rather than just
+  // checking it's 6 digits - best-effort, fails open if the lookup itself is unavailable.
+  useEffect(() => {
+    if (form.pincode.length !== 6) {
+      setPincodeValid(null);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const { data } = await api.get(`/pincode/${form.pincode}/verify`);
+        if (!cancelled) setPincodeValid(data.valid);
+      } catch (err) {
+        if (!cancelled) setPincodeValid(true);
+      }
+    }, 500);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [form.pincode]);
 
   const applyCoupon = async () => {
     if (!coupon) return;
@@ -103,14 +153,19 @@ export default function Checkout() {
   }
   // GST is computed on the full line subtotal, same as backend/routers/orders.py -
   // discount is applied as its own line after, not as a reduction to the taxable amount.
-  const shipping = subtotal >= freeShippingAbove ? 0 : shippingFlat;
-  const total = subtotal - discount + cgst + sgst + shipping;
+  const shipping = subtotal >= freeShippingAbove
+    ? 0
+    : (deliveryEstimate && deliveryEstimate.delivery_allowed ? deliveryEstimate.shipping : shippingFlat);
+  const total = subtotal - discount + cgst + sgst + (deliveryBlocked ? 0 : shipping);
   const availableCredit = credit.credit_limit - credit.credit_balance;
   const creditCoversOrder = availableCredit >= total;
 
   const placeOrder = async (e) => {
     e.preventDefault();
     if (items.length === 0) return toast.error("Your cart is empty");
+    if (!form.pincode || form.pincode.length !== 6) return toast.error("Enter a valid pincode");
+    if (pincodeValid === false) return toast.error("Enter a valid pincode — this pincode does not exist");
+    if (deliveryBlocked) return toast.error(deliveryEstimate.reason || "Delivery is not available at this address");
     setSubmitting(true);
     try {
       const payload = {
@@ -219,6 +274,24 @@ export default function Checkout() {
                   <Label>City *</Label>
                   <Input required data-testid="checkout-city" value={form.city} onChange={(e) => set("city", e.target.value)} className="mt-1.5 rounded-xl" />
                 </div>
+                <div>
+                  <Label>State *</Label>
+                  <Input required data-testid="checkout-state" value={form.state} onChange={(e) => set("state", e.target.value)} className="mt-1.5 rounded-xl" />
+                </div>
+                <div>
+                  <Label>Pincode *</Label>
+                  <Input
+                    required
+                    inputMode="numeric"
+                    maxLength={6}
+                    data-testid="checkout-pincode"
+                    value={form.pincode}
+                    onChange={(e) => set("pincode", e.target.value.replace(/[^0-9]/g, ""))}
+                    className="mt-1.5 rounded-xl"
+                    aria-invalid={pincodeValid === false}
+                  />
+                  {pincodeValid === false && <div className="text-xs text-rose-600 mt-1">This pincode does not exist</div>}
+                </div>
                 {addresses.length > 0 && (
                   <div className="md:col-span-2">
                     <Label>Saved Address</Label>
@@ -243,6 +316,13 @@ export default function Checkout() {
                   <Textarea data-testid="checkout-notes" value={form.notes} onChange={(e) => set("notes", e.target.value)} className="mt-1.5 rounded-xl" />
                 </div>
               </div>
+              {checkingDelivery && <div className="mt-3 text-xs text-slate-500">Checking delivery availability…</div>}
+              {deliveryBlocked && <div className="mt-3 text-sm text-rose-600">{deliveryEstimate.reason}</div>}
+              {!checkingDelivery && deliveryEstimate && deliveryEstimate.delivery_allowed && (
+                <div className="mt-3 text-xs text-brand-emerald">
+                  Delivery available{deliveryEstimate.distance_km ? ` · ${deliveryEstimate.distance_km} km away` : ""}
+                </div>
+              )}
             </div>
 
             <div className="card-premium p-6">
@@ -318,14 +398,17 @@ export default function Checkout() {
               {discount > 0 && <div className="flex justify-between text-brand-emerald"><span>Discount</span><span>-{formatINR(discount)}</span></div>}
               <div className="flex justify-between"><span className="text-slate-600">CGST</span><span>{formatINR(cgst)}</span></div>
               <div className="flex justify-between"><span className="text-slate-600">SGST</span><span>{formatINR(sgst)}</span></div>
-              <div className="flex justify-between"><span className="text-slate-600">Shipping</span><span>{shipping === 0 ? "Free" : formatINR(shipping)}</span></div>
+              <div className="flex justify-between">
+                <span className="text-slate-600">Shipping{deliveryEstimate?.delivery_allowed && deliveryEstimate.distance_km ? ` (${deliveryEstimate.distance_km} km)` : ""}</span>
+                <span>{deliveryBlocked ? "—" : (shipping === 0 ? "Free" : formatINR(shipping))}</span>
+              </div>
               <div className="border-t border-slate-100 pt-3 mt-2 flex justify-between items-center">
                 <span className="text-slate-900 font-semibold">Grand Total</span>
                 <span className="font-heading font-bold text-2xl text-slate-900" data-testid="checkout-total">{formatINR(total)}</span>
               </div>
             </div>
 
-            <button type="submit" disabled={submitting} className="btn-primary w-full mt-6 disabled:opacity-60" data-testid="place-order-btn">
+            <button type="submit" disabled={submitting || deliveryBlocked} className="btn-primary w-full mt-6 disabled:opacity-60" data-testid="place-order-btn">
               {submitting ? (payment === "online" ? "Processing payment…" : "Placing…") : payment === "online" ? "Pay Now" : "Place Order"} <ArrowRight className="w-4 h-4" />
             </button>
           </aside>

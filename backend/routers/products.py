@@ -215,6 +215,16 @@ async def get_product(slug: str = Path(min_length=1, max_length=200)):
     if not p:
         raise HTTPException(status_code=404, detail="Product not found")
     p["frequently_bought_together"] = await _frequently_bought_together(p["id"])
+    # variants: sibling products sharing the same variant_group (e.g. other sizes of this item)
+    if p.get("variant_group"):
+        variants = await db.products.find(
+            {"variant_group": p["variant_group"], "is_active": True},
+            {"_id": 0, "id": 1, "slug": 1, "name": 1, "variant_label": 1, "price": 1, "stock": 1, "images": 1},
+        ).to_list(50)
+        variants.sort(key=lambda v: v.get("variant_label") or "")
+        p["variants"] = variants
+    else:
+        p["variants"] = []
     return p
 
 

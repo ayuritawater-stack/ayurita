@@ -180,7 +180,7 @@ export default function Account() {
     }
   };
 
-  const emptyAddressForm = { label: "", address: "", city: "", gst_number: "", is_default: false };
+  const emptyAddressForm = { label: "", address: "", city: "", state: "", pincode: "", gst_number: "", is_default: false };
 
   const startAddAddress = () => setAddressForm({ ...emptyAddressForm });
   const startEditAddress = (a) => setAddressForm({ ...a });
@@ -189,10 +189,17 @@ export default function Account() {
 
   const saveAddress = async (e) => {
     e.preventDefault();
+    if (!addressForm.pincode || addressForm.pincode.length !== 6) return toast.error("Enter a valid 6-digit pincode");
     setSavingAddress(true);
     try {
-      const { id, label, address, city, gst_number, is_default } = addressForm;
-      const payload = { label, address, city, gst_number: gst_number || null, is_default };
+      try {
+        const { data: check } = await api.get(`/pincode/${addressForm.pincode}/verify`);
+        if (check.valid === false) { toast.error("Enter a valid pincode — this pincode does not exist"); setSavingAddress(false); return; }
+      } catch {
+        // lookup unavailable - fail open, don't block saving the address
+      }
+      const { id, label, address, city, state, pincode, gst_number, is_default } = addressForm;
+      const payload = { label, address, city, state, pincode, gst_number: gst_number || null, is_default };
       if (id) {
         const { data } = await api.put(`/customer/addresses/${id}`, payload);
         setAddresses((prev) => prev.map((a) => (a.id === id ? data : (data.is_default ? { ...a, is_default: false } : a))));
@@ -337,7 +344,7 @@ export default function Account() {
                         </div>
                       </div>
                       <div className="text-xs text-slate-500 mt-1">
-                        {a.address}, {a.city}
+                        {a.address}, {a.city}{a.state ? `, ${a.state}` : ""}{a.pincode ? ` - ${a.pincode}` : ""}
                         {a.gst_number && <> · GSTIN: {a.gst_number}</>}
                       </div>
                     </div>
@@ -359,6 +366,14 @@ export default function Account() {
                     <div className="sm:col-span-2">
                       <Label className="text-xs text-slate-500">Address</Label>
                       <Input required value={addressForm.address} onChange={(e) => updAddress("address", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500">State</Label>
+                      <Input required value={addressForm.state || ""} onChange={(e) => updAddress("state", e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-slate-500">Pincode</Label>
+                      <Input required inputMode="numeric" maxLength={6} value={addressForm.pincode || ""} onChange={(e) => updAddress("pincode", e.target.value.replace(/[^0-9]/g, ""))} />
                     </div>
                     <div>
                       <Label className="text-xs text-slate-500">GST Number (optional)</Label>

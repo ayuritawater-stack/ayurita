@@ -28,6 +28,7 @@ from routers import reviews as r_reviews
 from routers import questions as r_questions
 from routers import credit as r_credit
 from routers import returns as r_returns
+from routers import delivery as r_delivery
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ayurita")
@@ -65,6 +66,7 @@ api.include_router(r_credit.router)
 api.include_router(r_credit.requests_router)
 api.include_router(r_credit.reminders_router)
 api.include_router(r_returns.router)
+api.include_router(r_delivery.router)
 
 app.include_router(api)
 

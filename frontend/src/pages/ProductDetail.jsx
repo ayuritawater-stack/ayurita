@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { ShoppingCart, MessageCircle, Minus, Plus, ShieldCheck, Truck, Package, ChevronRight, Heart, Star, HelpCircle } from "lucide-react";
@@ -14,6 +14,7 @@ import ProductCard from "@/components/ProductCard";
 
 export default function ProductDetail() {
   const BUSINESS = useSettings();
+  const navigate = useNavigate();
   const { slug } = useParams();
   const { addItem } = useCart();
   const { toggle: toggleWl, has: inWl } = useWishlist();
@@ -175,6 +176,31 @@ export default function ProductDetail() {
               </span>
             </div>
 
+            {product.variants && product.variants.length > 1 && (
+              <div className="mt-4">
+                <div className="text-xs text-slate-500 mb-1.5">Size: <span className="font-semibold text-slate-900">{product.variant_label || product.size}</span></div>
+                <div className="flex flex-wrap gap-2" data-testid="variant-selector">
+                  {product.variants.map((v) => {
+                    const isActive = v.id === product.id;
+                    const outOfStock = (v.stock || 0) <= 0;
+                    return (
+                      <button
+                        key={v.id}
+                        type="button"
+                        disabled={isActive}
+                        onClick={() => navigate(`/products/${v.slug || v.id}`)}
+                        data-testid={`variant-${v.id}`}
+                        className={`rounded-xl border px-3 py-1.5 text-sm text-left min-w-[5.5rem] transition ${isActive ? "border-brand-primary ring-1 ring-brand-primary bg-sky-50" : "border-slate-200 hover:border-brand-primary/60"} ${outOfStock ? "opacity-50" : ""}`}
+                      >
+                        <div className="font-semibold text-slate-900">{v.variant_label || "Option"}</div>
+                        <div className="text-xs text-slate-500">{formatINR(v.price)}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="mt-6 pb-6 border-b border-slate-100">
               <div className="text-xs text-slate-500 uppercase tracking-wider">Unit Price</div>
               <div className="flex items-end gap-3 mt-1">
@@ -203,6 +229,20 @@ export default function ProductDetail() {
                 </div>
               ))}
             </div>
+
+            {product.specs && Object.keys(product.specs).length > 0 && (
+              <div className="mt-6" data-testid="product-additional-specs">
+                <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Specifications</div>
+                <div className="rounded-xl border border-slate-100 divide-y divide-slate-100 overflow-hidden">
+                  {Object.entries(product.specs).map(([k, v]) => (
+                    <div key={k} className="flex items-center justify-between px-4 py-2 text-sm odd:bg-slate-50">
+                      <span className="text-slate-500">{k}</span>
+                      <span className="font-medium text-slate-900">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {product.bulk_price && (
               <div className="mt-4 p-4 rounded-2xl border border-emerald-100 bg-emerald-50/50">

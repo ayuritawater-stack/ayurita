@@ -104,7 +104,7 @@ GSTIN: {_esc(BUSINESS['gstin'])}"""
     right = f"""<font color='#6B7280' size='8'>BILL TO</font><br/>
 <b>{_esc(guest.get('business_name', ''))}</b><br/>
 {_esc(guest.get('contact_person', ''))}<br/>
-{_esc(guest.get('address', ''))}, {_esc(guest.get('city', ''))}<br/>
+{_esc(guest.get('address', ''))}, {_esc(guest.get('city', ''))}{(' - ' + _esc(guest['pincode'])) if guest.get('pincode') else ''}<br/>
 Phone: {_esc(guest.get('phone', ''))}<br/>
 Email: {_esc(guest.get('email', ''))}<br/>
 {('GSTIN: ' + _esc(guest['gst_number'])) if guest.get('gst_number') else ''}"""
@@ -185,7 +185,9 @@ Email: {_esc(guest.get('email', ''))}<br/>
         cgst_total = sgst_total = gst_total / 2
     totals_rows.append([Paragraph("CGST", total_lbl), Paragraph(_rupees(cgst_total), total_val)])
     totals_rows.append([Paragraph("SGST", total_lbl), Paragraph(_rupees(sgst_total), total_val)])
-    totals_rows.append([Paragraph("Shipping", total_lbl), Paragraph(_rupees(order.get("shipping", 0)), total_val)])
+    distance_km = order.get("distance_km") or 0
+    shipping_label = f"Delivery Charge ({distance_km:g} km)" if distance_km else "Shipping"
+    totals_rows.append([Paragraph(shipping_label, total_lbl), Paragraph(_rupees(order.get("shipping", 0)), total_val)])
     totals_rows.append([
         Paragraph("<font size='12'><b>GRAND TOTAL</b></font>", ParagraphStyle("gtl", parent=total_lbl, fontSize=12, fontName="Helvetica-Bold")),
         Paragraph(f"<font size='12' color='#0F4C81'><b>{_rupees(order.get('grand_total', 0))}</b></font>", total_val),

@@ -25,6 +25,11 @@ const EMPTY = {
   large_order_threshold: 20000,
   return_window_days: 2,
   credit_reminder_lead_days: 3,
+  shop_lat: "",
+  shop_lng: "",
+  delivery_service_city: "",
+  delivery_radius_km: 25,
+  delivery_rate_per_km: 20,
 };
 
 const errorMessage = (err, fallback) => {
@@ -73,6 +78,11 @@ export default function AdminSettings() {
         large_order_threshold: Number(settings.large_order_threshold || 0),
         return_window_days: Number(settings.return_window_days || 0),
         credit_reminder_lead_days: Number(settings.credit_reminder_lead_days || 0),
+        shop_lat: settings.shop_lat === "" || settings.shop_lat == null ? null : Number(settings.shop_lat),
+        shop_lng: settings.shop_lng === "" || settings.shop_lng == null ? null : Number(settings.shop_lng),
+        delivery_service_city: settings.delivery_service_city || "",
+        delivery_radius_km: Number(settings.delivery_radius_km || 0),
+        delivery_rate_per_km: Number(settings.delivery_rate_per_km || 0),
       };
       await api.put("/admin/settings", payload);
       toast.success("Settings saved");
@@ -165,6 +175,36 @@ export default function AdminSettings() {
               <div>
                 <Label>Free Shipping Above</Label>
                 <Input type="number" value={settings.free_shipping_above} onChange={(e) => setField("free_shipping_above", e.target.value)} className="mt-1.5 rounded-xl" />
+              </div>
+            </div>
+          </section>
+
+          <section className="card-premium p-6">
+            <div className="font-semibold text-slate-900 mb-1">Distance-Based Delivery</div>
+            <p className="text-xs text-slate-500 mb-5">Calculates delivery charges by driving distance from the shop instead of the flat rate above, and restricts checkout to addresses within the service area. Requires a GOOGLE_MAPS_API_KEY on the server — falls back to the flat "Shipping" rate above if unset or unreachable.</p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label>Shop Latitude</Label>
+                <Input type="number" step="any" value={settings.shop_lat ?? ""} onChange={(e) => setField("shop_lat", e.target.value)} className="mt-1.5 rounded-xl" placeholder="e.g. 25.4182" />
+              </div>
+              <div>
+                <Label>Shop Longitude</Label>
+                <Input type="number" step="any" value={settings.shop_lng ?? ""} onChange={(e) => setField("shop_lng", e.target.value)} className="mt-1.5 rounded-xl" placeholder="e.g. 86.1272" />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3 mt-4">
+              <div>
+                <Label>Service City</Label>
+                <Input value={settings.delivery_service_city || ""} onChange={(e) => setField("delivery_service_city", e.target.value)} className="mt-1.5 rounded-xl" placeholder="e.g. Begusarai" />
+                <p className="text-xs text-slate-500 mt-1">A delivery address must geocode into this city to be served.</p>
+              </div>
+              <div>
+                <Label>Delivery Radius (km)</Label>
+                <Input type="number" value={settings.delivery_radius_km} onChange={(e) => setField("delivery_radius_km", e.target.value)} className="mt-1.5 rounded-xl" />
+              </div>
+              <div>
+                <Label>Rate per km (₹)</Label>
+                <Input type="number" value={settings.delivery_rate_per_km} onChange={(e) => setField("delivery_rate_per_km", e.target.value)} className="mt-1.5 rounded-xl" />
               </div>
             </div>
           </section>

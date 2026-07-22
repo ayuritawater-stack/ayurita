@@ -13,6 +13,7 @@ const EMPTY = {
   price: 0, bulk_price: 0, moq: 1, stock: 0, unit: "unit", packaging: "",
   description: "", images: [], featured: false, is_active: true, gst_rate: 18,
   sale_price: null, sale_starts_at: null, sale_ends_at: null,
+  specsList: [], variant_group: "", variant_label: "",
 };
 
 export default function AdminProducts() {
@@ -35,14 +36,18 @@ export default function AdminProducts() {
   useEffect(() => { load(); }, []);
 
   const onSave = async () => {
+    const { specsList, ...rest } = editing;
     const payload = {
-      ...editing,
+      ...rest,
       price: Number(editing.price),
       bulk_price: Number(editing.bulk_price) || null,
       moq: Number(editing.moq),
       stock: Number(editing.stock),
       gst_rate: Number(editing.gst_rate),
       sale_price: editing.sale_price ? Number(editing.sale_price) : null,
+      specs: Object.fromEntries((specsList || []).filter((s) => s.key.trim()).map((s) => [s.key.trim(), s.value])),
+      variant_group: editing.variant_group || "",
+      variant_label: editing.variant_label || "",
     };
     if (!payload.slug) payload.slug = payload.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
     const cat = cats.find((c) => c.id === payload.category_id);
@@ -74,6 +79,12 @@ export default function AdminProducts() {
     setEditing({ ...editing, images: [...(editing.images || []), imageInput.trim()] });
     setImageInput("");
   };
+
+  const openEdit = (p) => setEditing({ ...EMPTY, ...p, specsList: Object.entries(p.specs || {}).map(([key, value]) => ({ key, value })) });
+
+  const addSpec = () => setEditing((e) => ({ ...e, specsList: [...(e.specsList || []), { key: "", value: "" }] }));
+  const setSpec = (i, field, v) => setEditing((e) => ({ ...e, specsList: e.specsList.map((s, idx) => (idx === i ? { ...s, [field]: v } : s)) }));
+  const rmSpec = (i) => setEditing((e) => ({ ...e, specsList: e.specsList.filter((_, idx) => idx !== i) }));
 
   const exportCsv = () =>
     downloadFile("/products/export", {}, `ayurita-products-${new Date().toISOString().slice(0, 10)}.csv`).catch(() => toast.error("Export failed"));
@@ -194,7 +205,7 @@ export default function AdminProducts() {
                   {p.sale_price != null && <span className="chip !bg-rose-50 !text-rose-600 ml-1">Sale</span>}
                 </td>
                 <td className="px-6 py-3 text-right">
-                  <button onClick={() => setEditing({ ...p })} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center" data-testid={`edit-product-${p.slug}`}>
+                  <button onClick={() => openEdit(p)} className="w-8 h-8 rounded-lg bg-slate-100 hover:bg-slate-200 inline-flex items-center justify-center" data-testid={`edit-product-${p.slug}`}>
                     <Edit3 className="w-3.5 h-3.5" />
                   </button>
                   <button onClick={() => onDelete(p.id)} className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 inline-flex items-center justify-center ml-1" data-testid={`delete-product-${p.slug}`}>
@@ -283,6 +294,30 @@ export default function AdminProducts() {
                   </div>
                 </div>
               </div>
+              <div className="border-t border-slate-100 pt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold">Specifications (optional)</div>
+                  <button type="button" onClick={addSpec} className="btn-secondary !py-1 !px-3 text-xs" data-testid="admin-add-spec"><Plus className="w-3.5 h-3.5" /> Add spec</button>
+                </div>
+                {(editing.specsList || []).length === 0 && <div className="text-xs text-slate-400">No specifications — the "Specifications" section won't show on the product page.</div>}
+                {(editing.specsList || []).map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 mt-2">
+                    <Input placeholder="Label (e.g. Material)" value={s.key} onChange={(e) => setSpec(i, "key", e.target.value)} className="rounded-xl" data-testid={`admin-spec-key-${i}`} />
+                    <Input placeholder="Value (e.g. PET Plastic)" value={s.value} onChange={(e) => setSpec(i, "value", e.target.value)} className="rounded-xl" data-testid={`admin-spec-value-${i}`} />
+                    <button type="button" onClick={() => rmSpec(i)} className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 inline-flex items-center justify-center shrink-0"><X className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+
+              <div className="border-t border-slate-100 pt-4">
+                <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2">Size Variants (optional)</div>
+                <p className="text-xs text-slate-500 mb-2">To show a size selector on the product page (like "500ml / 1L"), give this product and its other sizes the same Variant Group. Each one keeps its own price, stock and images.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div><Label className="text-xs text-slate-500">Variant Group</Label><Input value={editing.variant_group} onChange={(e) => setEditing({ ...editing, variant_group: e.target.value })} className="mt-1.5 rounded-xl" placeholder="e.g. ayurita-jar" /></div>
+                  <div><Label className="text-xs text-slate-500">This Product's Size Label</Label><Input value={editing.variant_label} onChange={(e) => setEditing({ ...editing, variant_label: e.target.value })} className="mt-1.5 rounded-xl" placeholder="e.g. 1L" /></div>
+                </div>
+              </div>
+
               <div>
                 <Label>Packaging</Label>
                 <Input value={editing.packaging || ""} onChange={(e) => setEditing({ ...editing, packaging: e.target.value })} className="mt-1.5 rounded-xl" />

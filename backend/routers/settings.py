@@ -29,6 +29,13 @@ DEFAULT_SETTINGS = {
     "large_order_threshold": 20000.0,
     "return_window_days": 2,
     "credit_reminder_lead_days": 3,
+    # Placeholder shop coordinates (Begusarai town center) - replace with the shop's exact
+    # location in Admin > Settings for accurate distance-based delivery pricing.
+    "shop_lat": 25.4182,
+    "shop_lng": 86.1272,
+    "delivery_service_city": "Begusarai",
+    "delivery_radius_km": 25.0,
+    "delivery_rate_per_km": 20.0,
     "created_at": None,
     "updated_at": None,
 }

@@ -14,6 +14,7 @@ INDIAN_MOBILE_REGEX = r"^[6-9]\d{9}$"
 BUSINESS_PHONE_REGEX = r"^\+?\d{10,15}$"
 SLUG_REGEX = r"^[a-z0-9]+(?:-[a-z0-9]+)*$"
 ORDER_NUMBER_REGEX = r"^AYU-\d{8}-[A-Z0-9]{5}$"
+INDIAN_PINCODE_REGEX = r"^\d{6}$"
 
 _STRICT = ConfigDict(extra="forbid", strict=True)
 
@@ -65,6 +66,13 @@ class ProductIn(BaseModel):
     sale_price: Optional[float] = Field(None, ge=0, le=10_000_000)
     sale_starts_at: Optional[str] = Field(None, max_length=40)
     sale_ends_at: Optional[str] = Field(None, max_length=40)
+    specs: dict = Field(default_factory=dict)
+    # Links this product to sibling size/variant products (e.g. "500ml"/"1L" of the same item) so
+    # the product page can show a selector between them. Products sharing the same non-empty
+    # variant_group are treated as variants of one another; variant_label is what's shown on the
+    # selector button for this particular product.
+    variant_group: Optional[str] = Field("", max_length=100)
+    variant_label: Optional[str] = Field("", max_length=50)
 
 
 class CartItemIn(BaseModel):
@@ -81,6 +89,8 @@ class GuestInfo(BaseModel):
     email: EmailStr
     address: str = Field(min_length=1, max_length=500)
     city: str = Field(min_length=1, max_length=100)
+    state: str = Field(min_length=1, max_length=100)
+    pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
     gst_number: Optional[str] = Field(None, max_length=20)
     notes: Optional[str] = Field(None, max_length=2000)
 
@@ -260,8 +270,18 @@ class AddressIn(BaseModel):
     label: str = Field(min_length=1, max_length=50)
     address: str = Field(min_length=1, max_length=500)
     city: str = Field(min_length=1, max_length=100)
+    state: str = Field(min_length=1, max_length=100)
+    pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
     gst_number: Optional[str] = Field(None, max_length=20)
     is_default: bool = False
+
+
+class DeliveryEstimateIn(BaseModel):
+    model_config = _STRICT
+    address: str = Field(min_length=1, max_length=500)
+    city: str = Field(min_length=1, max_length=100)
+    state: str = Field("", max_length=100)
+    pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
 
 
 class WishlistMerge(BaseModel):
@@ -320,3 +340,13 @@ class SettingsIn(BaseModel):
     large_order_threshold: float = Field(20000.0, ge=0, le=100_000_000)
     return_window_days: int = Field(2, ge=0, le=90)
     credit_reminder_lead_days: int = Field(3, ge=0, le=30)
+    # Distance-based delivery charge (see services/delivery.py). shop_lat/shop_lng anchor the
+    # driving-distance calculation; delivery_service_city/delivery_radius_km define the
+    # serviceable area (a geocoded address must resolve to this city AND fall within the radius);
+    # shipping_flat above stays as the fallback used whenever the address can't be geocoded or
+    # shop coordinates aren't configured yet.
+    shop_lat: Optional[float] = Field(None, ge=-90, le=90)
+    shop_lng: Optional[float] = Field(None, ge=-180, le=180)
+    delivery_service_city: str = Field("Begusarai", max_length=100)
+    delivery_radius_km: float = Field(25.0, ge=0, le=1000)
+    delivery_rate_per_km: float = Field(20.0, ge=0, le=10_000)

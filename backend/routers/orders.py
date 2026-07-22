@@ -9,6 +9,7 @@ from models import OrderIn, OrderStatusUpdate, BulkStatusUpdate, CartItemIn, ORD
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message, send_text_message
 from routers.coupons import validate_coupon_doc
+from services.delivery import calculate_delivery_charge
 from security import get_client_ip
 from audit import record_audit
 
@@ -95,7 +96,7 @@ def _flash_sale_active(p: dict) -> bool:
     return True
 
 
-def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optional[dict], shipping_settings: dict):
+def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optional[dict]):
     subtotal = 0.0
     gst_total = 0.0
     cgst_total = 0.0
@@ -135,10 +136,6 @@ def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optiona
                 discount = min(discount, coupon["max_discount"])
         else:
             discount = coupon["value"]
-    free_above = shipping_settings.get("free_shipping_above", 500.0)
-    flat = shipping_settings.get("shipping_flat", 50.0)
-    shipping = 0.0 if subtotal >= free_above else flat
-    grand_total = round(subtotal - discount + gst_total + shipping, 2)
     return {
         "items": order_items,
         "subtotal": round(subtotal, 2),
@@ -146,8 +143,6 @@ def _compute_totals(products_map: dict, items: List[CartItemIn], coupon: Optiona
         "gst_total": round(gst_total, 2),
         "cgst_total": round(cgst_total, 2),
         "sgst_total": round(sgst_total, 2),
-        "shipping": shipping,
-        "grand_total": grand_total,
     }
 
 
@@ -170,13 +165,26 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
         # Re-validate server-side even though the frontend already called
         # /coupons/validate/{code} - that endpoint is advisory only, a client could otherwise
         # call this endpoint directly with an expired/over-limit/not-yet-started code.
-        prelim_subtotal = _compute_totals(products_map, body.items, None, settings)["subtotal"]
+        prelim_subtotal = _compute_totals(products_map, body.items, None)["subtotal"]
         try:
             validate_coupon_doc(coupon, prelim_subtotal)
         except HTTPException as exc:
             raise HTTPException(status_code=400, detail=f'Coupon "{body.coupon_code}" is no longer valid: {exc.detail}')
 
-    totals = _compute_totals(products_map, body.items, coupon, settings)
+    totals = _compute_totals(products_map, body.items, coupon)
+
+    # Distance-based delivery charge, checked (and can reject the order) before any stock or
+    # coupon reservation happens below - a customer must never be charged/reserved against and
+    # then told delivery isn't available at their address.
+    delivery = await calculate_delivery_charge(body.guest, settings)
+    if not delivery["delivery_allowed"]:
+        raise HTTPException(status_code=400, detail=delivery["reason"])
+    free_above = settings.get("free_shipping_above", 500.0)
+    taxable = totals["subtotal"] - totals["discount"]
+    shipping = 0.0 if (free_above and taxable >= free_above) else delivery["shipping"]
+    totals["shipping"] = shipping
+    totals["grand_total"] = round(taxable + totals["gst_total"] + shipping, 2)
+
     order_number = gen_order_number()
     now_str = iso(now_utc())
     order = {
@@ -185,6 +193,7 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
         "customer_id": customer["id"],
         "guest": body.guest.model_dump(),
         **totals,
+        "distance_km": delivery["distance_km"],
         "coupon_code": body.coupon_code,
         "payment_method": body.payment_method,
         "status": "placed",
