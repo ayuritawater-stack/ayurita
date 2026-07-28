@@ -7,6 +7,18 @@ export const api = axios.create({
   baseURL: API,
 });
 
+// FastAPI 422s return `detail` as an array of error objects — flatten to a string so it can be
+// shown in a toast (rendering the raw array crashes React with a white screen).
+export const errorMessage = (err, fallback) => {
+  const detail = err?.response?.data?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d) => d?.msg || d?.type).filter(Boolean);
+    if (msgs.length) return msgs.join("; ");
+  }
+  return fallback;
+};
+
 const parseJwt = (token) => {
   try {
     const [, payload] = token.split(".");

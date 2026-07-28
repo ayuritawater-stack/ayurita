@@ -83,7 +83,7 @@ export default function Products() {
 
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Category</div>
-              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
+              <div className="space-y-1.5">
                 <button
                   onClick={() => setCat("")}
                   data-testid="filter-cat-all"
@@ -180,7 +180,6 @@ export default function Products() {
                 Showing <span className="font-semibold text-slate-900">{total}</span> products
               </div>
             </div>
-            <div className="max-h-[75vh] overflow-y-auto pr-1">
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -204,7 +203,6 @@ export default function Products() {
                 ))}
               </motion.div>
             )}
-            </div>
           </div>
         </div>
       </div>

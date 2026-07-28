@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Package, Edit3, Trash2, Plus, X, Download, Upload, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
-import { api, formatINR, downloadFile } from "@/lib/api";
+import { api, formatINR, downloadFile, errorMessage } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -45,16 +45,19 @@ export default function AdminProducts() {
   useEffect(() => { load(); }, []);
 
   const onSave = async () => {
-    const { specsList, ...rest } = editing;
+    // Only send fields the backend model accepts — an edited product doc also carries id,
+    // created_at, updated_at etc., which the strict API rejects with a 422.
     const payload = {
-      ...rest,
+      ...Object.fromEntries(
+        Object.keys(EMPTY).filter((k) => k !== "specsList").map((k) => [k, editing[k]])
+      ),
       price: Number(editing.price),
       bulk_price: Number(editing.bulk_price) || null,
       moq: Number(editing.moq),
       stock: Number(editing.stock),
       gst_rate: Number(editing.gst_rate),
       sale_price: editing.sale_price ? Number(editing.sale_price) : null,
-      specs: Object.fromEntries((specsList || []).filter((s) => s.key.trim()).map((s) => [s.key.trim(), s.value])),
+      specs: Object.fromEntries((editing.specsList || []).filter((s) => s.key.trim()).map((s) => [s.key.trim(), s.value])),
       variant_group: editing.variant_group || "",
       variant_label: editing.variant_label || "",
     };
@@ -72,7 +75,7 @@ export default function AdminProducts() {
       setEditing(null);
       load();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Save failed");
+      toast.error(errorMessage(err, "Save failed"));
     }
   };
 
@@ -131,7 +134,7 @@ export default function AdminProducts() {
       if (data.errors?.length) toast.error(`${data.errors.length} row(s) had errors — see details`);
       await load();
     } catch (err) {
-      toast.error(err.response?.data?.detail || "Import failed");
+      toast.error(errorMessage(err, "Import failed"));
     } finally {
       setImporting(false);
     }
