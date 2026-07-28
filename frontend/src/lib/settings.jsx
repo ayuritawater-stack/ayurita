@@ -35,6 +35,11 @@ export function SettingsProvider({ children }) {
           mapEmbed: data.address
             ? `https://www.google.com/maps?q=${encodeURIComponent(data.address)}&output=embed`
             : DEFAULT_BUSINESS.mapEmbed,
+          // Admin-uploadable storefront images — null when the admin hasn't set one, in which
+          // case pages keep their built-in visuals.
+          heroImage: data.hero_image || null,
+          aboutHeroImage: data.about_hero_image || null,
+          aboutImage: data.about_image || null,
         });
       })
       .catch(() => {

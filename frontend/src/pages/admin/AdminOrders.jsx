@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle, Archive } from "lucide-react";
 import { api, formatINR, downloadFile } from "@/lib/api";
@@ -19,7 +20,11 @@ const statusStyles = {
 export default function AdminOrders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState("all");
+  // Status filter lives in the URL (?status=...) so dashboard cards can deep-link to a
+  // pre-filtered order list.
+  const [sp, setSp] = useSearchParams();
+  const filter = sp.get("status") || "all";
+  const setFilter = (v) => setSp(v === "all" ? {} : { status: v }, { replace: true });
   const [detail, setDetail] = useState(null);
   const [selected, setSelected] = useState([]);
   const [bulkStatus, setBulkStatus] = useState("confirmed");
@@ -156,8 +161,9 @@ export default function AdminOrders() {
       )}
 
       <div className="card-premium overflow-hidden">
+        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 sticky top-0 z-10">
             <tr>
               <th className="px-6 py-3 w-10">
                 <input
@@ -218,6 +224,7 @@ export default function AdminOrders() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {detail && (

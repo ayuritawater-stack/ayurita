@@ -36,6 +36,9 @@ DEFAULT_SETTINGS = {
     "delivery_service_city": "Begusarai",
     "delivery_radius_km": 25.0,
     "delivery_rate_per_km": 20.0,
+    "hero_image": None,
+    "about_hero_image": None,
+    "about_image": None,
     "created_at": None,
     "updated_at": None,
 }
@@ -43,6 +46,7 @@ DEFAULT_SETTINGS = {
 PUBLIC_FIELDS = [
     "business_name", "tagline", "address", "phone", "whatsapp",
     "email", "gstin", "business_hours", "shipping_flat", "free_shipping_above",
+    "hero_image", "about_hero_image", "about_image",
 ]
 
 

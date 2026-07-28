@@ -11,6 +11,7 @@ import { isFlashSaleActive, effectivePrice } from "@/lib/pricing";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import ProductCard from "@/components/ProductCard";
+import FramedImage from "@/components/FramedImage";
 
 export default function ProductDetail() {
   const BUSINESS = useSettings();
@@ -134,9 +135,9 @@ export default function ProductDetail() {
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-sky-50 to-slate-50 mb-4"
+              className="relative aspect-square rounded-3xl overflow-hidden bg-gradient-to-br from-sky-50 to-slate-50 mb-4"
             >
-              <img src={product.images?.[activeImg]} alt={product.name} className="w-full h-full object-cover" />
+              <FramedImage src={product.images?.[activeImg]} alt={product.name} data-testid="product-main-image" />
             </motion.div>
             <div className="grid grid-cols-4 gap-3">
               {product.images?.map((img, i) => (
@@ -146,7 +147,7 @@ export default function ProductDetail() {
                   className={`aspect-square rounded-xl overflow-hidden border-2 transition ${activeImg === i ? "border-brand-primary" : "border-transparent hover:border-slate-200"}`}
                   data-testid={`gallery-thumb-${i}`}
                 >
-                  <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+                  <img src={img} alt={`${product.name} ${i + 1}`} className="w-full h-full object-contain" />
                 </button>
               ))}
             </div>

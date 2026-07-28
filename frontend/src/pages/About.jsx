@@ -18,18 +18,48 @@ const timeline = [
 
 export default function About() {
   const BUSINESS = useSettings();
+  const bannerImg = BUSINESS.aboutHeroImage;
   return (
     <div>
-      {/* Hero */}
-      <section className="py-16 md:py-24 bg-ripple">
-        <div className="container-x max-w-4xl text-center">
-          <div className="text-eyebrow mb-3">About Ayurita</div>
-          <h1 className="h-hero">Pure water. Trusted quality. Built for Bihar's businesses.</h1>
-          <p className="text-slate-600 mt-6 text-lg leading-relaxed">
+      {/* Hero — keeps its gradient when no banner image is set; with one, the photo fills the
+          band under a dark scrim and the copy flips to white to stay legible. */}
+      <section className={`relative overflow-hidden py-16 md:py-24 ${bannerImg ? "" : "bg-ripple"}`}>
+        {bannerImg && (
+          <>
+            <img src={bannerImg} alt="" aria-hidden="true" className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-b from-slate-900/80 via-slate-900/65 to-slate-900/50" />
+          </>
+        )}
+        <div className="container-x max-w-4xl text-center relative z-10">
+          <div className={`text-eyebrow mb-3 ${bannerImg ? "!text-sky-300" : ""}`}>About Ayurita</div>
+          <h1 className={`h-hero ${bannerImg ? "!text-white" : ""}`}>Pure water. Trusted quality. Built for Bihar's businesses.</h1>
+          <p className={`mt-6 text-lg leading-relaxed ${bannerImg ? "text-slate-200" : "text-slate-600"}`}>
             Ayurita Packaged Drinking Water was born in Bishanpur, Begusarai, with one simple mission — to deliver water that businesses can rely on, every single day. Today, we serve 150+ hotels, offices, hospitals and events across the district.
           </p>
         </div>
       </section>
+
+      {/* Our Story photo — admin-uploadable, section renders only when an image is set */}
+      {BUSINESS.aboutImage && (
+        <section className="py-16 bg-white">
+          <div className="container-x grid md:grid-cols-2 gap-10 items-center">
+            <div className="flex flex-col justify-center">
+              <div className="text-eyebrow mb-3">Our Story</div>
+              <h2 className="h-section">From Bishanpur, for all of Begusarai</h2>
+              <p className="text-slate-600 mt-5 text-lg leading-relaxed">
+                What started as a small bottling unit in Bishanpur now supplies hotels, restaurants, hospitals, offices and events across the district — the same promise behind every jar and bottle: pure, lab-tested water, delivered on time.
+              </p>
+            </div>
+            <div>
+              <img
+                src={BUSINESS.aboutImage}
+                alt="Ayurita — our story"
+                className="w-full h-auto max-w-md mx-auto rounded-3xl border border-slate-100 shadow-lg"
+              />
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Mission / Vision */}
       <section className="py-16">

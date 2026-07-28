@@ -141,7 +141,7 @@ export default function Home() {
           >
             <div className="relative aspect-square max-w-[520px] mx-auto rounded-[2rem] overflow-hidden shadow-[0_30px_80px_-30px_rgba(15,76,129,0.5)]">
               <img
-                src="https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=1200"
+                src={BUSINESS.heroImage || "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=1200"}
                 alt="Ayurita packaged drinking water bottle"
                 className="w-full h-full object-cover"
               />

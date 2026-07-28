@@ -33,7 +33,7 @@ export default function AdminContactMessages() {
       ) : items.length === 0 ? (
         <div className="card-premium p-12 text-center text-slate-500">No contact messages yet.</div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto pr-1">
           {items.map((m) => (
             <div key={m.id} className="card-premium p-6" data-testid={`msg-${m.id}`}>
               <div className="flex items-center justify-between mb-3">

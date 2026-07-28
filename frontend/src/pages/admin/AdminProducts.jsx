@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Package, Edit3, Trash2, Plus, X, Download, Upload, FileSpreadsheet } from "lucide-react";
+import { Package, Edit3, Trash2, Plus, X, Download, Upload, FileSpreadsheet, Image as ImageIcon } from "lucide-react";
 import { api, formatINR, downloadFile } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,12 +16,21 @@ const EMPTY = {
   specsList: [], variant_group: "", variant_label: "",
 };
 
+const readFileAsDataURL = (file) =>
+  new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
   const [cats, setCats] = useState([]);
   const [editing, setEditing] = useState(null); // product or EMPTY
   const [imageInput, setImageInput] = useState("");
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
@@ -80,7 +89,26 @@ export default function AdminProducts() {
     setImageInput("");
   };
 
+  const setImage = (i, v) => setEditing((e) => ({ ...e, images: e.images.map((x, idx) => (idx === i ? v : x)) }));
+  const rmImage = (i) => setEditing((e) => ({ ...e, images: e.images.filter((_, idx) => idx !== i) }));
+  const uploadProductImage = async (i, file) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error("Image too large. Please use under 2MB.");
+    const b64 = await readFileAsDataURL(file);
+    setImage(i, b64);
+  };
+  const uploadNewImage = async (file) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error("Image too large. Please use under 2MB.");
+    const b64 = await readFileAsDataURL(file);
+    setEditing((e) => ({ ...e, images: [...(e.images || []), b64] }));
+  };
+
   const openEdit = (p) => setEditing({ ...EMPTY, ...p, specsList: Object.entries(p.specs || {}).map(([key, value]) => ({ key, value })) });
+
+  const visibleProducts = products.filter((p) =>
+    statusFilter === "all" ? true : statusFilter === "active" ? p.is_active : !p.is_active
+  );
 
   const addSpec = () => setEditing((e) => ({ ...e, specsList: [...(e.specsList || []), { key: "", value: "" }] }));
   const setSpec = (i, field, v) => setEditing((e) => ({ ...e, specsList: e.specsList.map((s, idx) => (idx === i ? { ...s, [field]: v } : s)) }));
@@ -116,7 +144,15 @@ export default function AdminProducts() {
           <div className="text-xs uppercase tracking-[0.18em] font-semibold text-brand-primary">Products</div>
           <h1 className="font-heading font-bold text-3xl tracking-tight text-slate-900 mt-1">Product Management</h1>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-36 rounded-xl" data-testid="product-status-filter"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All statuses</SelectItem>
+              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="inactive">Inactive</SelectItem>
+            </SelectContent>
+          </Select>
           <button onClick={downloadTemplate} className="btn-secondary" title="Download a blank CSV to fill in">
             <FileSpreadsheet className="w-4 h-4" /> Template
           </button>
@@ -160,8 +196,9 @@ export default function AdminProducts() {
       )}
 
       <div className="card-premium overflow-hidden">
+        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 sticky top-0 z-10">
             <tr>
               <th className="text-left px-6 py-3">Product</th>
               <th className="text-left px-6 py-3">Category</th>
@@ -175,9 +212,9 @@ export default function AdminProducts() {
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr><td colSpan="7" className="p-8 text-center text-slate-500">Loading…</td></tr>
-            ) : products.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-slate-500">No products yet.</td></tr>
-            ) : products.map((p) => (
+            ) : visibleProducts.length === 0 ? (
+              <tr><td colSpan="7" className="p-8 text-center text-slate-500">No products.</td></tr>
+            ) : visibleProducts.map((p) => (
               <tr key={p.id} className="hover:bg-slate-50" data-testid={`product-row-${p.slug}`}>
                 <td className="px-6 py-3">
                   <div className="flex items-center gap-3">
@@ -216,6 +253,7 @@ export default function AdminProducts() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Drawer */}
@@ -327,20 +365,40 @@ export default function AdminProducts() {
                 <Textarea value={editing.description || ""} onChange={(e) => setEditing({ ...editing, description: e.target.value })} className="mt-1.5 rounded-xl min-h-[80px]" />
               </div>
               <div>
-                <Label>Images (URLs)</Label>
-                <div className="flex gap-2 mt-1.5">
-                  <Input value={imageInput} onChange={(e) => setImageInput(e.target.value)} placeholder="https://…" className="rounded-xl" />
-                  <button type="button" onClick={addImage} className="btn-secondary !py-2 !px-4">Add</button>
-                </div>
-                <div className="grid grid-cols-4 gap-2 mt-3">
-                  {(editing.images || []).map((img, i) => (
-                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      <button type="button" onClick={() => setEditing({ ...editing, images: editing.images.filter((_, j) => j !== i) })} className="absolute top-1 right-1 w-6 h-6 rounded-full bg-white/90 flex items-center justify-center">
-                        <X className="w-3 h-3" />
+                <Label>Images (URLs or upload)</Label>
+                <div className="space-y-2 mt-1.5">
+                  {(editing.images || []).map((im, i) => (
+                    <div key={i} className="flex gap-2 items-center">
+                      {im ? (
+                        <img src={im} className="h-12 w-12 rounded-lg object-cover border border-slate-200 bg-slate-100 shrink-0" alt="" />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-slate-100 grid place-items-center shrink-0"><ImageIcon className="w-4 h-4 text-slate-400" /></div>
+                      )}
+                      <Input
+                        value={im.startsWith("data:") ? "(uploaded image)" : im}
+                        readOnly={im.startsWith("data:")}
+                        onChange={(e) => setImage(i, e.target.value)}
+                        placeholder="https://…"
+                        className="rounded-xl"
+                      />
+                      <label className="cursor-pointer shrink-0">
+                        <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { uploadProductImage(i, e.target.files[0]); e.target.value = ""; }} />
+                        <span className="btn-secondary !py-2 !px-3 text-xs"><Upload className="w-3.5 h-3.5" /> Upload</span>
+                      </label>
+                      <button type="button" onClick={() => rmImage(i)} className="w-8 h-8 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-500 inline-flex items-center justify-center shrink-0">
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ))}
+                  <div className="flex gap-2">
+                    <Input value={imageInput} onChange={(e) => setImageInput(e.target.value)} placeholder="Add image URL: https://…" className="rounded-xl" />
+                    <button type="button" onClick={addImage} className="btn-secondary !py-2 !px-4 shrink-0">Add URL</button>
+                    <label className="cursor-pointer shrink-0">
+                      <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => { uploadNewImage(e.target.files[0]); e.target.value = ""; }} data-testid="prod-upload-image" />
+                      <span className="btn-secondary !py-2 !px-4"><Upload className="w-4 h-4" /> Upload</span>
+                    </label>
+                  </div>
+                  <p className="text-xs text-slate-400">Uploads are PNG/JPEG/WEBP under 2MB, stored with the product.</p>
                 </div>
               </div>
               <div className="flex items-center justify-between pt-2">

@@ -7,6 +7,7 @@ import { useWishlist } from "@/lib/wishlist";
 import { useCompare } from "@/lib/compare";
 import { isFlashSaleActive } from "@/lib/pricing";
 import { toast } from "sonner";
+import FramedImage from "@/components/FramedImage";
 
 export default function ProductCard({ product, index = 0 }) {
   const { addItem } = useCart();
@@ -42,11 +43,11 @@ export default function ProductCard({ product, index = 0 }) {
       data-testid={`product-card-${product.slug}`}
     >
       <Link to={`/products/${product.slug}`} className="block relative overflow-hidden bg-gradient-to-br from-sky-50 to-slate-50 aspect-[4/3]">
-        <img
+        <FramedImage
           src={product.images?.[0]}
           alt={product.name}
           loading="lazy"
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+          className="transition-transform duration-700 group-hover:scale-105"
         />
         <div className="absolute top-3 left-3 flex gap-2">
           <span className="chip !bg-white/90 !text-brand-primary">{product.size}</span>

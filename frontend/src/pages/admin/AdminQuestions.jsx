@@ -61,7 +61,7 @@ export default function AdminQuestions() {
         </Select>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-1">
         {loading ? (
           <div className="card-premium p-8 text-center text-slate-500">Loading…</div>
         ) : items.length === 0 ? (

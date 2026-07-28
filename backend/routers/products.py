@@ -16,7 +16,8 @@ from security import get_client_ip
 router = APIRouter(tags=["products"])
 
 PRODUCT_CSV_COLUMNS = [
-    "id", "name", "slug", "category", "size", "unit", "price", "bulk_price", "moq", "stock",
+    "id", "name", "slug", "category", "size", "unit", "variant_group", "variant_label",
+    "price", "bulk_price", "moq", "stock",
     "packaging", "description", "images", "featured", "is_active", "gst_rate",
     "sale_price", "sale_starts_at", "sale_ends_at",
 ]
@@ -48,6 +49,8 @@ async def list_products(
     size: Optional[str] = Query(None, max_length=50),
     featured: Optional[bool] = None,
     in_stock: Optional[bool] = None,
+    min_price: Optional[float] = Query(None, ge=0, le=10_000_000),
+    max_price: Optional[float] = Query(None, ge=0, le=10_000_000),
     limit: int = Query(100, ge=1, le=500),
 ):
     filt: dict = {"is_active": True}
@@ -67,6 +70,13 @@ async def list_products(
         filt["featured"] = featured
     if in_stock:
         filt["stock"] = {"$gt": 0}
+    if min_price is not None or max_price is not None:
+        price_filt: dict = {}
+        if min_price is not None:
+            price_filt["$gte"] = min_price
+        if max_price is not None:
+            price_filt["$lte"] = max_price
+        filt["price"] = price_filt
     return await db.products.find(filt, {"_id": 0}).limit(limit).to_list(limit)
 
 
@@ -82,7 +92,8 @@ async def export_products(admin: dict = Depends(get_current_admin)):
     for d in docs:
         writer.writerow([csv_safe(v) for v in [
             d.get("id", ""), d.get("name", ""), d.get("slug", ""), d.get("category_name", ""),
-            d.get("size", ""), d.get("unit", ""), d.get("price", 0), d.get("bulk_price") or "",
+            d.get("size", ""), d.get("unit", ""), d.get("variant_group", ""), d.get("variant_label", ""),
+            d.get("price", 0), d.get("bulk_price") or "",
             d.get("moq", 1), d.get("stock", 0), d.get("packaging") or "", d.get("description") or "",
             ";".join(d.get("images") or []), d.get("featured", False), d.get("is_active", True),
             d.get("gst_rate", 18), d.get("sale_price") or "", d.get("sale_starts_at") or "", d.get("sale_ends_at") or "",
@@ -98,7 +109,7 @@ async def product_import_template(admin: dict = Depends(get_current_admin)):
     writer = csv.writer(buf)
     writer.writerow(PRODUCT_CSV_COLUMNS)
     writer.writerow([
-        "", "Sample Product", "", "Bottles", "500ml", "bottle", "10", "8", "24", "500",
+        "", "Sample Product", "", "Bottles", "500ml", "bottle", "", "", "10", "8", "24", "500",
         "Case of 24 bottles", "Full product description here",
         "https://example.com/img1.jpg;https://example.com/img2.jpg", "false", "true", "18", "", "", "",
     ])
@@ -148,6 +159,8 @@ async def import_products(request: Request, admin: dict = Depends(require_owner)
                 moq=int(float(row.get("moq") or 1)),
                 stock=int(float(row.get("stock") or 0)),
                 unit=(row.get("unit") or "bottle").strip() or "bottle",
+                variant_group=(row.get("variant_group") or "").strip(),
+                variant_label=(row.get("variant_label") or "").strip(),
                 packaging=(row.get("packaging") or "").strip() or None,
                 description=(row.get("description") or "").strip() or None,
                 images=[u.strip() for u in (row.get("images") or "").split(";") if u.strip()],

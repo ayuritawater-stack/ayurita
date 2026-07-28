@@ -132,7 +132,7 @@ export default function AdminDashboard() {
         </div>
 
         <div className="space-y-5">
-          <div className="card-premium p-6">
+          <Link to="/admin/orders?status=delivered" className="card-premium p-6 block hover:border-brand-primary transition-colors" data-testid="card-delivered-orders">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-brand-emerald flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5" />
@@ -142,8 +142,8 @@ export default function AdminDashboard() {
                 <div className="text-xs text-slate-500">Delivered orders</div>
               </div>
             </div>
-          </div>
-          <div className="card-premium p-6">
+          </Link>
+          <Link to="/admin/orders?status=placed" className="card-premium p-6 block hover:border-brand-primary transition-colors" data-testid="card-pending-orders">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
                 <Clock className="w-5 h-5" />
@@ -153,8 +153,8 @@ export default function AdminDashboard() {
                 <div className="text-xs text-slate-500">Pending orders</div>
               </div>
             </div>
-          </div>
-          <div className="card-premium p-6">
+          </Link>
+          <Link to="/admin/contact-messages" className="card-premium p-6 block hover:border-brand-primary transition-colors" data-testid="card-contact-messages">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center">
                 <MessagesSquare className="w-5 h-5" />
@@ -164,7 +164,7 @@ export default function AdminDashboard() {
                 <div className="text-xs text-slate-500">New contact messages</div>
               </div>
             </div>
-          </div>
+          </Link>
 
           <div className="card-premium p-6" data-testid="credit-widget">
             <div className="flex items-center justify-between mb-3">

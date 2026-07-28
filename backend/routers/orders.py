@@ -356,6 +356,11 @@ async def _apply_order_status(order_id: str, status: str, request: Request, admi
         {"$set": {"status": status, "updated_at": now_str, "timeline": timeline}},
     )
     updated_order = await db.orders.find_one({"id": order_id}, {"_id": 0})
+    if updated_order is None:
+        # The order vanished between the write and the re-read (e.g. concurrent delete) - fall
+        # back to the state just written rather than notifying/returning None.
+        order.pop("_id", None)
+        updated_order = {**order, "status": status, "updated_at": now_str, "timeline": timeline}
     await record_audit(db, admin_email, get_client_ip(request), "update_order_status", order_id, {"status": status})
     if status != old_status:
         _notify_order_status(updated_order)

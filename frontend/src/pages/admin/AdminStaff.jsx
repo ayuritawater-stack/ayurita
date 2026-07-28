@@ -160,7 +160,7 @@ export default function AdminStaff() {
         {loading ? (
           <div className="text-slate-500">Loading…</div>
         ) : (
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 max-h-[70vh] overflow-y-auto pr-1">
             {staff.map((s) => (
               <div key={s.id} data-testid={`staff-row-${s.id}`}>
                 <div className="py-3 flex items-center gap-4">

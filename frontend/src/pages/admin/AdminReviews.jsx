@@ -80,8 +80,9 @@ export default function AdminReviews() {
       </div>
 
       <div className="card-premium overflow-hidden">
+        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 sticky top-0 z-10">
             <tr>
               <th className="text-left px-6 py-3">Business</th>
               <th className="text-left px-6 py-3">Rating</th>
@@ -132,6 +133,7 @@ export default function AdminReviews() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

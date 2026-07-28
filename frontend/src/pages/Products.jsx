@@ -15,6 +15,13 @@ export default function Products() {
   const [cat, setCat] = useState("");
   const [size, setSize] = useState("");
   const [inStock, setInStock] = useState(false);
+  // Price range only applies on the Apply button (or Enter) — not on every keystroke, which
+  // would refetch mid-typing (e.g. "1" of "100").
+  const [minInput, setMinInput] = useState("");
+  const [maxInput, setMaxInput] = useState("");
+  const [priceRange, setPriceRange] = useState({ min: "", max: "" });
+
+  const applyPriceFilter = () => setPriceRange({ min: minInput, max: maxInput });
 
   useEffect(() => {
     api.get("/categories").then((r) => setCategories(r.data)).catch(() => {});
@@ -27,9 +34,11 @@ export default function Products() {
     if (cat) params.category = cat;
     if (size) params.size = size;
     if (inStock) params.in_stock = true;
+    if (priceRange.min !== "") params.min_price = priceRange.min;
+    if (priceRange.max !== "") params.max_price = priceRange.max;
     api.get("/products", { params }).then((r) => setProducts(r.data)).finally(() => setLoading(false));
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, [q, cat, size, inStock]);
+  }, [q, cat, size, inStock, priceRange]);
 
   const total = products.length;
 
@@ -74,7 +83,7 @@ export default function Products() {
 
             <div>
               <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Category</div>
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 max-h-[40vh] overflow-y-auto pr-1">
                 <button
                   onClick={() => setCat("")}
                   data-testid="filter-cat-all"
@@ -117,6 +126,33 @@ export default function Products() {
               </div>
             </div>
 
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Price Range (₹)</div>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Min"
+                  type="number"
+                  value={minInput}
+                  onChange={(e) => setMinInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyPriceFilter(); }}
+                  className="rounded-xl"
+                  data-testid="filter-min-price"
+                />
+                <Input
+                  placeholder="Max"
+                  type="number"
+                  value={maxInput}
+                  onChange={(e) => setMaxInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") applyPriceFilter(); }}
+                  className="rounded-xl"
+                  data-testid="filter-max-price"
+                />
+              </div>
+              <button onClick={applyPriceFilter} className="btn-secondary w-full mt-2 !py-2 justify-center" data-testid="apply-price-filter">
+                Apply Filter
+              </button>
+            </div>
+
             <label className="flex items-center gap-2 text-sm cursor-pointer">
               <input
                 type="checkbox"
@@ -129,7 +165,7 @@ export default function Products() {
             </label>
 
             <button
-              onClick={() => { setQ(""); setCat(""); setSize(""); setInStock(false); }}
+              onClick={() => { setQ(""); setCat(""); setSize(""); setInStock(false); setMinInput(""); setMaxInput(""); setPriceRange({ min: "", max: "" }); }}
               className="text-xs font-semibold text-brand-primary hover:underline"
               data-testid="filter-clear"
             >
@@ -144,6 +180,7 @@ export default function Products() {
                 Showing <span className="font-semibold text-slate-900">{total}</span> products
               </div>
             </div>
+            <div className="max-h-[75vh] overflow-y-auto pr-1">
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
@@ -167,6 +204,7 @@ export default function Products() {
                 ))}
               </motion.div>
             )}
+            </div>
           </div>
         </div>
       </div>

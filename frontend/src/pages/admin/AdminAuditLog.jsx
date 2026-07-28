@@ -19,6 +19,17 @@ const actionLabels = {
   update_settings: "Updated business settings",
 };
 
+// Timestamps are stored/returned in UTC — audit log readers are IST-based admins, so render
+// in Asia/Kolkata rather than the raw UTC string (which reads ~5:30 "behind" what happened).
+const istParts = (isoUtc) => {
+  if (!isoUtc) return { date: "", time: "" };
+  const d = new Date(isoUtc);
+  if (Number.isNaN(d.getTime())) return { date: isoUtc, time: "" };
+  const date = d.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" }); // YYYY-MM-DD
+  const time = d.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour12: false }); // HH:mm:ss
+  return { date, time };
+};
+
 export default function AdminAuditLog() {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -52,22 +63,26 @@ export default function AdminAuditLog() {
       </div>
 
       <div className="card-premium overflow-hidden">
+        <div className="overflow-x-auto max-h-[70vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 sticky top-0 z-10">
             <tr>
               <th className="text-left px-6 py-3">Action</th>
               <th className="text-left px-6 py-3">Admin</th>
               <th className="text-left px-6 py-3">IP Address</th>
               <th className="text-left px-6 py-3">Details</th>
-              <th className="text-left px-6 py-3">When</th>
+              <th className="text-left px-6 py-3">Date</th>
+              <th className="text-left px-6 py-3">Time</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
-              <tr><td colSpan="5" className="p-8 text-center text-slate-500">Loading…</td></tr>
+              <tr><td colSpan="6" className="p-8 text-center text-slate-500">Loading…</td></tr>
             ) : logs.length === 0 ? (
-              <tr><td colSpan="5" className="p-8 text-center text-slate-500">No audit entries yet.</td></tr>
-            ) : logs.map((l) => (
+              <tr><td colSpan="6" className="p-8 text-center text-slate-500">No audit entries yet.</td></tr>
+            ) : logs.map((l) => {
+              const { date, time } = istParts(l.timestamp);
+              return (
               <tr key={l.id} className="hover:bg-slate-50" data-testid={`audit-row-${l.id}`}>
                 <td className="px-6 py-3">
                   <div className="flex items-center gap-2 font-semibold text-slate-900">
@@ -80,11 +95,14 @@ export default function AdminAuditLog() {
                 <td className="px-6 py-3 text-xs text-slate-500 max-w-xs truncate">
                   {l.details && Object.keys(l.details).length > 0 ? JSON.stringify(l.details) : "—"}
                 </td>
-                <td className="px-6 py-3 text-xs text-slate-500">{l.timestamp?.slice(0, 19).replace("T", " ")}</td>
+                <td className="px-6 py-3 text-xs text-slate-500 whitespace-nowrap">{date}</td>
+                <td className="px-6 py-3 text-xs text-slate-500 whitespace-nowrap">{time}</td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );

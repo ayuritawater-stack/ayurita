@@ -5,8 +5,11 @@ Every model rejects unknown fields (`extra="forbid"`) and disables type coercion
 int is expected) is rejected with a 422, not silently dropped/coerced. Combined with per-field
 length/range/pattern constraints below, this is validate-and-reject rather than sanitize-and-accept.
 """
+import base64
+import io
 from typing import List, Literal, Optional
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from PIL import Image as PILImage
 
 INDIAN_MOBILE_REGEX = r"^[6-9]\d{9}$"
 # Business contact numbers (Settings) are stored with an optional "+" and country code, unlike
@@ -17,6 +20,65 @@ ORDER_NUMBER_REGEX = r"^AYU-\d{8}-[A-Z0-9]{5}$"
 INDIAN_PINCODE_REGEX = r"^\d{6}$"
 
 _STRICT = ConfigDict(extra="forbid", strict=True)
+
+# All "image upload" fields in this app (product images, category image, settings hero/about
+# images) accept either a plain http(s) URL or a base64 data URI produced by the admin panel's
+# file pickers. A stored data URI is served back verbatim inside <img> tags, so it must be proven
+# to be a real image at upload time - not trusted from its declared MIME type or extension.
+# 2MB image -> ~2.8MB base64, hence the field max_length used on these fields.
+IMAGE_FIELD_MAX_LENGTH = 2_800_000
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+ALLOWED_IMAGE_MIME_TYPES = {"image/png": "PNG", "image/jpeg": "JPEG", "image/webp": "WEBP"}
+
+
+def validate_image_field(value: Optional[str], field_label: str) -> Optional[str]:
+    """Validates an image field's value in place and returns it unchanged if valid.
+
+    - None/'' (field not provided) passes through untouched.
+    - A plain http(s):// URL passes through untouched (nothing to decode - the image itself
+      lives on whatever host serves that URL, out of this app's control either way).
+    - A data: URI must declare an allow-listed image MIME type, decode as valid base64, be
+      under MAX_IMAGE_BYTES once decoded, and Pillow must be able to open the decoded bytes and
+      confirm they're a genuine image whose actual format matches what was declared.
+    Anything else raises ValueError, which FastAPI turns into a 422 - the upload is rejected
+    outright rather than stored and dealt with later.
+    """
+    if not value:
+        return value
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    if not value.startswith("data:"):
+        raise ValueError(f"{field_label} must be an image URL or a base64 data URI")
+
+    try:
+        header, b64_data = value.split(",", 1)
+    except ValueError:
+        raise ValueError(f"{field_label} is not a valid data URI")
+
+    declared_mime = header[len("data:"):].split(";")[0].strip().lower()
+    if declared_mime not in ALLOWED_IMAGE_MIME_TYPES:
+        raise ValueError(f'{field_label} must be a PNG, JPEG, or WEBP image (got "{declared_mime or "unknown"}")')
+
+    try:
+        raw = base64.b64decode(b64_data, validate=True)
+    except Exception:
+        raise ValueError(f"{field_label} is not valid base64-encoded data")
+
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise ValueError(f"{field_label} must be under 2MB")
+
+    try:
+        with PILImage.open(io.BytesIO(raw)) as probe:
+            actual_format = (probe.format or "").upper()
+        with PILImage.open(io.BytesIO(raw)) as probe2:
+            probe2.verify()
+    except Exception:
+        raise ValueError(f"{field_label} content is not a valid image file")
+
+    if actual_format != ALLOWED_IMAGE_MIME_TYPES[declared_mime]:
+        raise ValueError(f"{field_label} content does not match its declared type ({declared_mime})")
+
+    return value
 
 
 class LoginRequest(BaseModel):
@@ -42,7 +104,12 @@ class CategoryIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     slug: str = Field(min_length=1, max_length=200, pattern=SLUG_REGEX)
     description: Optional[str] = Field(None, max_length=2000)
-    image_url: Optional[str] = Field(None, max_length=2000)
+    image_url: Optional[str] = Field(None, max_length=IMAGE_FIELD_MAX_LENGTH)
+
+    @field_validator("image_url")
+    @classmethod
+    def validate_image_url(cls, v: Optional[str]) -> Optional[str]:
+        return validate_image_field(v, "Category image")
 
 
 class ProductIn(BaseModel):
@@ -74,11 +141,46 @@ class ProductIn(BaseModel):
     variant_group: Optional[str] = Field("", max_length=100)
     variant_label: Optional[str] = Field("", max_length=50)
 
+    @field_validator("images")
+    @classmethod
+    def validate_images(cls, images: List[str]) -> List[str]:
+        for img in images:
+            validate_image_field(img, "Product image")
+        return images
+
 
 class CartItemIn(BaseModel):
     model_config = _STRICT
     product_id: str = Field(min_length=1, max_length=64)
     quantity: int = Field(ge=1, le=100_000)
+
+
+# Delivery is Begusarai-only. The geocoding-based service-area check in services/delivery.py
+# fails open when Google Maps is unavailable, and the India Post pincode lookup is only a UI
+# hint - so the checkout address itself must enforce the service area, otherwise POST /orders
+# accepts any 6-digit pincode as long as the city/state text reads right. All Begusarai-district
+# pincodes share this prefix (e.g. 851101, 851129).
+SERVICE_CITY = "begusarai"
+SERVICE_STATE = "bihar"
+SERVICE_PINCODE_PREFIX = "851"
+
+
+def _validate_service_area_city(v: str) -> str:
+    if v.strip().lower() != SERVICE_CITY:
+        raise ValueError("Delivery is available in Begusarai only")
+    return v
+
+
+def _validate_service_area_state(v: str) -> str:
+    if v.strip().lower() != SERVICE_STATE:
+        raise ValueError("Delivery is available in Begusarai, Bihar only")
+    return v
+
+
+def _validate_service_area_pincode(v: str) -> str:
+    if not v.startswith(SERVICE_PINCODE_PREFIX):
+        raise ValueError("This pincode is outside our Begusarai delivery area")
+    return v
 
 
 class GuestInfo(BaseModel):
@@ -93,6 +195,21 @@ class GuestInfo(BaseModel):
     pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
     gst_number: Optional[str] = Field(None, max_length=20)
     notes: Optional[str] = Field(None, max_length=2000)
+
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, v: str) -> str:
+        return _validate_service_area_city(v)
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        return _validate_service_area_state(v)
+
+    @field_validator("pincode")
+    @classmethod
+    def validate_pincode(cls, v: str) -> str:
+        return _validate_service_area_pincode(v)
 
 
 class OrderIn(BaseModel):
@@ -275,6 +392,23 @@ class AddressIn(BaseModel):
     gst_number: Optional[str] = Field(None, max_length=20)
     is_default: bool = False
 
+    # Same service-area rule as GuestInfo - a saved address the shop can't deliver to would only
+    # fail later at checkout, so reject it up front.
+    @field_validator("city")
+    @classmethod
+    def validate_city(cls, v: str) -> str:
+        return _validate_service_area_city(v)
+
+    @field_validator("state")
+    @classmethod
+    def validate_state(cls, v: str) -> str:
+        return _validate_service_area_state(v)
+
+    @field_validator("pincode")
+    @classmethod
+    def validate_pincode(cls, v: str) -> str:
+        return _validate_service_area_pincode(v)
+
 
 class DeliveryEstimateIn(BaseModel):
     model_config = _STRICT
@@ -350,3 +484,24 @@ class SettingsIn(BaseModel):
     delivery_service_city: str = Field("Begusarai", max_length=100)
     delivery_radius_km: float = Field(25.0, ge=0, le=1000)
     delivery_rate_per_km: float = Field(20.0, ge=0, le=10_000)
+    # Admin-uploadable storefront images (URL or base64 data URI, validated like product images):
+    # hero_image replaces the hardcoded homepage hero photo, about_hero_image sits behind the
+    # About page's heading banner, about_image is the "Our Story" photo on the About page.
+    hero_image: Optional[str] = Field(None, max_length=IMAGE_FIELD_MAX_LENGTH)
+    about_hero_image: Optional[str] = Field(None, max_length=IMAGE_FIELD_MAX_LENGTH)
+    about_image: Optional[str] = Field(None, max_length=IMAGE_FIELD_MAX_LENGTH)
+
+    @field_validator("hero_image")
+    @classmethod
+    def validate_hero_image(cls, v: Optional[str]) -> Optional[str]:
+        return validate_image_field(v, "Hero image")
+
+    @field_validator("about_hero_image")
+    @classmethod
+    def validate_about_hero_image(cls, v: Optional[str]) -> Optional[str]:
+        return validate_image_field(v, "About banner image")
+
+    @field_validator("about_image")
+    @classmethod
+    def validate_about_image(cls, v: Optional[str]) -> Optional[str]:
+        return validate_image_field(v, "About image")

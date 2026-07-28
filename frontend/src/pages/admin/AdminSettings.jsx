@@ -30,7 +30,46 @@ const EMPTY = {
   delivery_service_city: "",
   delivery_radius_km: 25,
   delivery_rate_per_km: 20,
+  hero_image: null,
+  about_hero_image: null,
+  about_image: null,
 };
+
+const readFileAsDataURL = (file) =>
+  new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+const ImageUploadField = ({ label, hint, value, onChange, testid }) => (
+  <div className="space-y-2">
+    <Label>{label}</Label>
+    {hint && <p className="text-xs text-slate-500">{hint}</p>}
+    <div className="aspect-video max-w-xs rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
+      {value ? (
+        <img src={value} alt={label} className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-xs text-slate-400">No image</div>
+      )}
+    </div>
+    <div className="flex items-center gap-2 max-w-xs">
+      <Input
+        type="file"
+        accept="image/png,image/jpeg,image/webp"
+        onChange={(e) => onChange(e.target.files[0])}
+        className="rounded-xl"
+        data-testid={testid}
+      />
+      {value && (
+        <button type="button" onClick={() => onChange(null)} className="text-xs text-rose-500 hover:underline shrink-0">
+          Remove
+        </button>
+      )}
+    </div>
+  </div>
+);
 
 const errorMessage = (err, fallback) => {
   const detail = err.response?.data?.detail;
@@ -64,6 +103,18 @@ export default function AdminSettings() {
   }, []);
 
   const setField = (key, value) => setSettings((prev) => ({ ...prev, [key]: value }));
+
+  // null clears the image; a File is validated (≤2MB, image type) and stored as a base64 data
+  // URI — the backend re-validates the decoded bytes with Pillow before accepting it.
+  const uploadImage = async (key, file) => {
+    if (file === null || file === undefined) {
+      if (file === null) setField(key, null);
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) return toast.error("Image too large. Please use under 2MB.");
+    const b64 = await readFileAsDataURL(file);
+    setField(key, b64);
+  };
 
   const save = async () => {
     setSaving(true);
@@ -144,6 +195,34 @@ export default function AdminSettings() {
                 <Label>Business Hours</Label>
                 <Input value={settings.business_hours} onChange={(e) => setField("business_hours", e.target.value)} className="mt-1.5 rounded-xl" />
               </div>
+            </div>
+          </section>
+
+          <section className="card-premium p-6">
+            <div className="font-semibold text-slate-900 mb-1">Website Images</div>
+            <p className="text-xs text-slate-500 mb-5">Photos shown on the public site. PNG/JPEG/WEBP, under 2MB each. Leave empty to keep the built-in visuals.</p>
+            <div className="grid gap-6 md:grid-cols-3">
+              <ImageUploadField
+                label="Homepage Hero Photo"
+                hint="The large photo beside the homepage headline."
+                value={settings.hero_image}
+                onChange={(f) => uploadImage("hero_image", f)}
+                testid="upload-hero-image"
+              />
+              <ImageUploadField
+                label="About Banner Background"
+                hint="Sits behind the heading at the top of the About page. A wide shot works best."
+                value={settings.about_hero_image}
+                onChange={(f) => uploadImage("about_hero_image", f)}
+                testid="upload-about-hero-image"
+              />
+              <ImageUploadField
+                label="Our Story Photo"
+                hint='Adds an "Our Story" photo section to the About page when set.'
+                value={settings.about_image}
+                onChange={(f) => uploadImage("about_image", f)}
+                testid="upload-about-image"
+              />
             </div>
           </section>
 
