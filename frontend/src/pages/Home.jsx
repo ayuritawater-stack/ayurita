@@ -8,7 +8,6 @@ import {
 import { api } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import ProductCard from "@/components/ProductCard";
-import HeroBottleOverlay from "@/components/HeroBottleOverlay";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const industries = [
@@ -54,17 +53,28 @@ export default function Home() {
   return (
     <div className="overflow-x-hidden">
       {/* HERO */}
-      <section className="relative pt-8 md:pt-14 pb-20 bg-ripple overflow-hidden" data-testid="hero-section">
-        <div className="container-x grid lg:grid-cols-12 gap-10 items-center">
-          <div className="lg:col-span-6">
+      <section
+        className="relative overflow-hidden min-h-[600px] md:min-h-[680px] lg:min-h-[760px] flex items-center pt-24 pb-20"
+        style={{
+          backgroundImage: `url(${BUSINESS.heroImage || "/images/hero-bg.jpg"})`,
+          backgroundSize: "cover",
+          backgroundPosition: "65% center",
+        }}
+        data-testid="hero-section"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-[#081B3E]/92 via-[#0B2249]/55 to-[#0B2249]/10" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#081B3E]/55 via-transparent to-transparent" />
+
+        <div className="container-x relative z-10">
+          <div className="max-w-xl rounded-[28px] p-5 sm:p-7 bg-[#081B3E]/50 backdrop-blur-[3px] lg:bg-transparent lg:backdrop-blur-none lg:p-0">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
-              <span className="text-eyebrow">Pure By Nature</span>
+              <span className="text-eyebrow text-white/90">Pure By Nature</span>
             </motion.div>
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.05 }}
-              className="h-hero mt-4"
+              className="h-hero mt-4 text-white"
             >
               Sustained <br className="hidden md:block" />
               By <span className="text-brand-emerald">Purpose</span>
@@ -76,16 +86,16 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.15 }}
               className="flex items-center gap-3 mt-6"
             >
-              <span className="w-10 h-px bg-brand-border" />
+              <span className="w-10 h-px bg-white/30" />
               <Droplets className="w-4 h-4 text-brand-emerald" strokeWidth={1.8} />
-              <span className="w-10 h-px bg-brand-border" />
+              <span className="w-10 h-px bg-white/30" />
             </motion.div>
 
             <motion.p
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.2 }}
-              className="lead mt-6 max-w-lg"
+              className="lead mt-6 max-w-lg text-sky-50/90"
             >
               Ayurita is more than just water — a quiet expression of what sustains us. Reliable wholesale and bulk packaged drinking water for hotels, restaurants, corporates and events across Begusarai District, backed by 20+ quality checks and GST-compliant invoicing.
             </motion.p>
@@ -106,7 +116,7 @@ export default function Home() {
                 href={`https://wa.me/${BUSINESS.whatsapp}`}
                 target="_blank"
                 rel="noreferrer"
-                className="btn-ghost"
+                className="inline-flex items-center justify-center gap-2.5 rounded-full px-6 py-4 font-bold text-[12px] uppercase tracking-[0.12em] transition-colors duration-300 text-white/90 hover:text-white"
                 data-testid="hero-cta-whatsapp"
               >
                 <MessageCircle className="w-4 h-4" /> WhatsApp
@@ -117,7 +127,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.7, delay: 0.45 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 pt-8 border-t border-brand-border max-w-lg"
+              className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 pt-8 border-t border-white/20 max-w-lg"
             >
               {[
                 { label: "Natural Water", value: "100% Pure", icon: Droplets },
@@ -126,69 +136,43 @@ export default function Home() {
                 { label: "Sustainable Choice", value: "Eco Friendly", icon: TrendingUp },
               ].map((s) => (
                 <div key={s.label}>
-                  <s.icon className="w-6 h-6 text-brand-primary mb-2.5" strokeWidth={1.5} />
-                  <div className="text-[13px] font-heading font-bold uppercase tracking-wide text-brand-primary leading-tight">{s.value}</div>
-                  <div className="text-[11px] text-brand-secondary mt-0.5">{s.label}</div>
+                  <s.icon className="w-6 h-6 text-white mb-2.5" strokeWidth={1.5} />
+                  <div className="text-[13px] font-heading font-bold uppercase tracking-wide text-white leading-tight">{s.value}</div>
+                  <div className="text-[11px] text-sky-100/70 mt-0.5">{s.label}</div>
                 </div>
               ))}
             </motion.div>
           </div>
-
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.9, delay: 0.2 }}
-            className="lg:col-span-6 relative"
-          >
-            <div className="relative aspect-[4/5] max-w-[560px] mx-auto rounded-[2rem] overflow-hidden shadow-[0_30px_80px_-30px_rgba(18,59,122,0.35)] bg-white">
-              {BUSINESS.heroImage ? (
-                <img
-                  src={BUSINESS.heroImage}
-                  alt="Ayurita packaged drinking water bottle"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <>
-                  <img
-                    src="/images/hero-lake.jpg"
-                    alt="Clear lake and mountains, the source of Ayurita's water"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
-                  <HeroBottleOverlay className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[42%] h-[78%] drop-shadow-[0_20px_30px_rgba(0,0,0,0.25)]" />
-                </>
-              )}
-            </div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="absolute -bottom-6 -left-4 md:left-0 glass rounded-2xl p-4 flex items-center gap-3 shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-full bg-red-50 text-brand-emerald flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Same-Day</div>
-                <div className="text-sm font-heading font-bold text-brand-primary">Dispatch Ready</div>
-              </div>
-            </motion.div>
-            <motion.div
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.75 }}
-              className="absolute -top-2 -right-2 md:right-4 glass rounded-2xl p-4 flex items-center gap-3 shadow-xl"
-            >
-              <div className="w-10 h-10 rounded-full bg-sky-100 text-brand-primary flex items-center justify-center">
-                <Truck className="w-5 h-5" />
-              </div>
-              <div>
-                <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Dispatch policy</div>
-                <div className="text-sm font-heading font-bold text-brand-primary">Same day under 20 km</div>
-              </div>
-            </motion.div>
-          </motion.div>
         </div>
+
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="hidden md:flex absolute bottom-10 right-8 lg:right-16 z-10 glass rounded-2xl p-4 items-center gap-3 shadow-xl"
+        >
+          <div className="w-10 h-10 rounded-full bg-red-50 text-brand-emerald flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Same-Day</div>
+            <div className="text-sm font-heading font-bold text-brand-primary">Dispatch Ready</div>
+          </div>
+        </motion.div>
+        <motion.div
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.75 }}
+          className="hidden lg:flex absolute top-28 right-16 z-10 glass rounded-2xl p-4 items-center gap-3 shadow-xl"
+        >
+          <div className="w-10 h-10 rounded-full bg-sky-100 text-brand-primary flex items-center justify-center">
+            <Truck className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Dispatch policy</div>
+            <div className="text-sm font-heading font-bold text-brand-primary">Same day under 20 km</div>
+          </div>
+        </motion.div>
       </section>
 
       {/* FEATURED PRODUCTS */}
