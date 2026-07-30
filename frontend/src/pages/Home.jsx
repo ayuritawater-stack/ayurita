@@ -54,7 +54,7 @@ export default function Home() {
     <div className="overflow-x-hidden">
       {/* HERO */}
       <section
-        className="relative overflow-hidden min-h-[600px] md:min-h-[680px] lg:min-h-[760px] flex items-center pt-24 pb-20"
+        className="relative overflow-hidden min-h-[600px] md:min-h-[680px] lg:min-h-[740px] flex flex-col"
         style={{
           backgroundImage: `url(${BUSINESS.heroImage || "/images/hero-bg.jpg"})`,
           backgroundSize: "cover",
@@ -63,9 +63,9 @@ export default function Home() {
         data-testid="hero-section"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-[#081B3E]/92 via-[#0B2249]/55 to-[#0B2249]/10" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#081B3E]/55 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#081B3E]/85 via-[#081B3E]/15 to-transparent" />
 
-        <div className="container-x relative z-10">
+        <div className="container-x relative z-10 flex-1 flex items-center pt-14 pb-12">
           <div className="max-w-xl rounded-[28px] p-5 sm:p-7 bg-[#081B3E]/50 backdrop-blur-[3px] lg:bg-transparent lg:backdrop-blur-none lg:p-0">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <span className="text-eyebrow text-white/90">Pure By Nature</span>
@@ -104,7 +104,7 @@ export default function Home() {
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, delay: 0.3 }}
-              className="flex flex-wrap gap-3 mt-9"
+              className="flex flex-wrap gap-3 mt-8"
             >
               <Link to="/products" className="btn-primary" data-testid="hero-cta-quote">
                 Explore Our Water <ArrowRight className="w-4 h-4" />
@@ -123,54 +123,32 @@ export default function Home() {
               </a>
             </motion.div>
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.7, delay: 0.45 }}
-              className="grid grid-cols-2 sm:grid-cols-4 gap-6 mt-16 pt-8 border-t border-white/20 max-w-lg"
-            >
-              {[
-                { label: "Natural Water", value: "100% Pure", icon: Droplets },
-                { label: "Perfectly Balanced", value: "Balanced pH", icon: FlaskConical },
-                { label: "Quality Assured", value: "Safe & Tested", icon: ShieldCheck },
-                { label: "Sustainable Choice", value: "Eco Friendly", icon: TrendingUp },
-              ].map((s) => (
-                <div key={s.label}>
-                  <s.icon className="w-6 h-6 text-white mb-2.5" strokeWidth={1.5} />
-                  <div className="text-[13px] font-heading font-bold uppercase tracking-wide text-white leading-tight">{s.value}</div>
-                  <div className="text-[11px] text-sky-100/70 mt-0.5">{s.label}</div>
-                </div>
-              ))}
-            </motion.div>
           </div>
         </div>
 
+        {/* trust bar pinned to the bottom of the hero */}
         <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="hidden md:flex absolute bottom-10 right-8 lg:right-16 z-10 glass rounded-2xl p-4 items-center gap-3 shadow-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.7, delay: 0.45 }}
+          className="relative z-10 border-t border-white/15 bg-[#081B3E]/60 backdrop-blur-sm"
         >
-          <div className="w-10 h-10 rounded-full bg-red-50 text-brand-emerald flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Same-Day</div>
-            <div className="text-sm font-heading font-bold text-brand-primary">Dispatch Ready</div>
-          </div>
-        </motion.div>
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.75 }}
-          className="hidden lg:flex absolute top-28 right-16 z-10 glass rounded-2xl p-4 items-center gap-3 shadow-xl"
-        >
-          <div className="w-10 h-10 rounded-full bg-sky-100 text-brand-primary flex items-center justify-center">
-            <Truck className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-[11px] text-brand-secondary uppercase tracking-wide">Dispatch policy</div>
-            <div className="text-sm font-heading font-bold text-brand-primary">Same day under 20 km</div>
+          <div className="container-x py-5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-5">
+            {[
+              { label: "Natural Water", value: "100% Pure", icon: Droplets },
+              { label: "Perfectly Balanced", value: "Balanced pH", icon: FlaskConical },
+              { label: "Quality Assured", value: "Safe & Tested", icon: ShieldCheck },
+              { label: "Sustainable Choice", value: "Eco Friendly", icon: TrendingUp },
+              { label: "Dispatch under 20 km", value: "Same-Day", icon: Truck },
+            ].map((s) => (
+              <div key={s.label} className="flex items-center gap-3">
+                <s.icon className="w-6 h-6 shrink-0 text-white/85" strokeWidth={1.5} />
+                <div className="min-w-0">
+                  <div className="text-[13px] font-heading font-bold uppercase tracking-wide text-white leading-tight">{s.value}</div>
+                  <div className="text-[11px] text-sky-100/70 mt-0.5 leading-snug">{s.label}</div>
+                </div>
+              </div>
+            ))}
           </div>
         </motion.div>
       </section>
