@@ -62,10 +62,10 @@ export default function Home() {
         }}
         data-testid="hero-section"
       >
-        <div className="absolute inset-0 bg-gradient-to-r from-[#081B3E]/92 via-[#0B2249]/55 to-[#0B2249]/10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-[#081B3E]/80 via-[#0B2249]/35 to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#081B3E]/85 via-[#081B3E]/15 to-transparent" />
 
-        <div className="container-x relative z-10 flex-1 flex items-center pt-14 pb-12">
+        <div className="container-x w-full relative z-10 flex-1 flex items-center pt-14 pb-12">
           <div className="max-w-xl rounded-[28px] p-5 sm:p-7 bg-[#081B3E]/50 backdrop-blur-[3px] lg:bg-transparent lg:backdrop-blur-none lg:p-0">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
               <span className="text-eyebrow text-white/90">Pure By Nature</span>
