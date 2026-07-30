@@ -8,7 +8,7 @@ import {
 import { api } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
 import ProductCard from "@/components/ProductCard";
-import HeroBottleScene from "@/components/HeroBottleScene";
+import HeroBottleOverlay from "@/components/HeroBottleOverlay";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 const industries = [
@@ -148,7 +148,15 @@ export default function Home() {
                   className="w-full h-full object-cover"
                 />
               ) : (
-                <HeroBottleScene className="w-full h-full object-cover" />
+                <>
+                  <img
+                    src="/images/hero-lake.jpg"
+                    alt="Clear lake and mountains, the source of Ayurita's water"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-transparent" />
+                  <HeroBottleOverlay className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[42%] h-[78%] drop-shadow-[0_20px_30px_rgba(0,0,0,0.25)]" />
+                </>
               )}
             </div>
             <motion.div
