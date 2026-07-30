@@ -8,8 +8,9 @@ module.exports = {
   theme: {
     extend: {
       fontFamily: {
-        heading: ['Poppins', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        heading: ['Archivo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['"Playfair Display"', 'ui-serif', 'Georgia', 'serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -58,16 +59,17 @@ module.exports = {
           '5': 'hsl(var(--chart-5))'
         },
         brand: {
-          primary: '#0F4C81',
-          'primary-hover': '#0C3D68',
-          secondary: '#38BDF8',
-          'secondary-hover': '#0EA5E9',
-          emerald: '#10B981',
-          'emerald-hover': '#059669',
-          bg: '#F8FAFC',
-          text: '#111827',
-          muted: '#6B7280',
-          border: '#E5E7EB',
+          primary: '#123B7A',
+          'primary-hover': '#0D2C5C',
+          secondary: '#4A6E8F',
+          'secondary-hover': '#35526C',
+          emerald: '#D42128',
+          'emerald-hover': '#B21A21',
+          navy: '#0B2249',
+          bg: '#F8FBFF',
+          text: '#123B7A',
+          muted: '#55708F',
+          border: '#E6EDF6',
         },
       },
       keyframes: {
