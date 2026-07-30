@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import { Menu, ShoppingCart, Phone, X, Heart, User, Scale } from "lucide-react";
+import { Menu, ShoppingCart, Phone, X, Heart, User, Scale, PackageSearch } from "lucide-react";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
 import { useCompare } from "@/lib/compare";
@@ -13,7 +13,6 @@ const NAV = [
   { to: "/categories", label: "Categories" },
   { to: "/bulk-order", label: "Bulk Order" },
   { to: "/about", label: "About" },
-  { to: "/order-tracking", label: "Track Order" },
   { to: "/contact", label: "Contact" },
 ];
 
@@ -45,14 +44,30 @@ export default function Navbar() {
       }`}
       data-testid="site-navbar"
     >
-      <div className="container-x flex items-center justify-between h-20 md:h-24">
-        <Link to="/" className="flex items-center group" data-testid="brand-logo">
-          <span className="font-heading font-extrabold text-2xl md:text-[28px] tracking-tight text-brand-primary">
+      {/* utility bar */}
+      <div className="hidden lg:block bg-brand-bg border-b border-brand-border">
+        <div className="container-x flex items-center justify-end gap-6 h-9 text-[12px] font-medium text-brand-secondary">
+          <a href={`tel:${BUSINESS.phone}`} className="inline-flex items-center gap-1.5 hover:text-brand-primary transition" data-testid="nav-phone">
+            <Phone className="w-3.5 h-3.5" strokeWidth={1.8} /> {BUSINESS.phoneDisplay}
+          </a>
+          <Link to="/order-tracking" className="inline-flex items-center gap-1.5 hover:text-brand-primary transition" data-testid="nav-track-order">
+            <PackageSearch className="w-3.5 h-3.5" strokeWidth={1.8} /> Track Order
+          </Link>
+          <Link to={customerIn ? "/account" : "/signin"} className="inline-flex items-center gap-1.5 hover:text-brand-primary transition" data-testid="nav-account-text">
+            <User className="w-3.5 h-3.5" strokeWidth={1.8} /> {customerIn ? "My Account" : "Sign In"}
+          </Link>
+        </div>
+      </div>
+
+      {/* main bar */}
+      <div className="container-x flex items-center justify-between h-[76px] md:h-20">
+        <Link to="/" className="flex items-center group shrink-0" data-testid="brand-logo">
+          <span className="font-heading font-extrabold text-2xl md:text-[26px] tracking-tight text-brand-primary">
             Ayur<span className="relative">i<span className="absolute -top-1.5 left-[3px] w-[5px] h-[5px] rounded-full bg-brand-emerald" />ta</span>
           </span>
         </Link>
 
-        <nav className="hidden xl:flex items-center gap-8">
+        <nav className="hidden lg:flex items-center gap-7 mx-4">
           {NAV.map((item) => (
             <NavLink
               key={item.to}
@@ -67,23 +82,7 @@ export default function Navbar() {
           ))}
         </nav>
 
-        <div className="flex items-center gap-2 md:gap-2.5">
-          <a
-            href={`tel:${BUSINESS.phone}`}
-            className="hidden xl:inline-flex items-center gap-2 text-[13px] font-semibold text-brand-secondary hover:text-brand-primary transition whitespace-nowrap mr-1"
-            data-testid="nav-phone"
-          >
-            <Phone className="w-4 h-4" strokeWidth={1.8} />
-            {BUSINESS.phoneDisplay}
-          </a>
-          <Link
-            to={customerIn ? "/account" : "/signin"}
-            className="w-10 h-10 rounded-full bg-brand-bg hover:bg-[#E6EDF6] hidden sm:flex items-center justify-center transition"
-            data-testid="nav-account"
-            aria-label={customerIn ? "My Account" : "Sign In"}
-          >
-            <User className="w-[18px] h-[18px] text-brand-primary" strokeWidth={1.8} />
-          </Link>
+        <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
           <Link
             to="/wishlist"
             className="relative w-10 h-10 rounded-full bg-brand-bg hover:bg-[#E6EDF6] hidden sm:flex items-center justify-center transition"
@@ -122,11 +121,11 @@ export default function Navbar() {
               </span>
             )}
           </Link>
-          <Link to="/products" className="hidden md:inline-flex btn-primary !py-2.5 !px-6" data-testid="nav-quote">
+          <Link to="/products" className="hidden md:inline-flex btn-primary !py-2.5 !px-6 ml-1" data-testid="nav-quote">
             <ShoppingCart className="w-3.5 h-3.5" strokeWidth={2.2} /> Buy Now
           </Link>
           <button
-            className="xl:hidden w-10 h-10 rounded-full bg-brand-bg flex items-center justify-center"
+            className="lg:hidden w-10 h-10 rounded-full bg-brand-bg flex items-center justify-center"
             onClick={() => setOpen((v) => !v)}
             data-testid="nav-menu-toggle"
             aria-label="Toggle menu"
@@ -137,9 +136,9 @@ export default function Navbar() {
       </div>
 
       {open && (
-        <div className="xl:hidden bg-white border-t border-brand-border" data-testid="mobile-nav">
+        <div className="lg:hidden bg-white border-t border-brand-border" data-testid="mobile-nav">
           <div className="container-x py-4 flex flex-col gap-1">
-            {NAV.map((item) => (
+            {[...NAV, { to: "/order-tracking", label: "Track Order" }].map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -153,6 +152,12 @@ export default function Navbar() {
                 {item.label}
               </NavLink>
             ))}
+            <a href={`tel:${BUSINESS.phone}`} className="px-4 py-3 rounded-xl text-sm font-semibold text-brand-secondary hover:bg-brand-bg inline-flex items-center gap-2">
+              <Phone className="w-4 h-4" strokeWidth={1.8} /> {BUSINESS.phoneDisplay}
+            </a>
+            <Link to={customerIn ? "/account" : "/signin"} className="px-4 py-3 rounded-xl text-sm font-semibold text-brand-secondary hover:bg-brand-bg inline-flex items-center gap-2">
+              <User className="w-4 h-4" strokeWidth={1.8} /> {customerIn ? "My Account" : "Sign In"}
+            </Link>
             <Link to="/bulk-order" className="btn-primary mt-2 w-full">
               Request Bulk Quote
             </Link>
