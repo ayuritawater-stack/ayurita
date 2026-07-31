@@ -6,6 +6,7 @@ import { useWishlist } from "@/lib/wishlist";
 import { useCompare } from "@/lib/compare";
 import { isCustomerLoggedIn } from "@/lib/api";
 import { useSettings } from "@/lib/settings";
+import Logo from "@/components/Logo";
 
 const NAV = [
   { to: "/", label: "Home" },
@@ -62,9 +63,7 @@ export default function Navbar() {
       {/* main bar */}
       <div className="container-x flex items-center justify-between h-[76px] md:h-20">
         <Link to="/" className="flex items-center group shrink-0" data-testid="brand-logo">
-          <span className="font-heading font-extrabold text-2xl md:text-[26px] tracking-tight text-brand-primary">
-            Ayur<span className="relative">i<span className="absolute -top-1.5 left-[3px] w-[5px] h-[5px] rounded-full bg-brand-emerald" />ta</span>
-          </span>
+          <Logo className="text-[28px] md:text-[32px]" />
         </Link>
 
         <nav className="hidden lg:flex items-center gap-7 mx-4">

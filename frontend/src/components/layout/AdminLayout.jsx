@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate, Link } from "react-router-dom";
 import { LayoutDashboard, ShoppingBag, Package, FolderTree, MessagesSquare, Mail, TicketPercent, LogOut, Droplets, ExternalLink, UserCircle, Users, Star, HelpCircle, Wallet, Undo2, ShieldCheck, BarChart3 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { api } from "@/lib/api";
+import Logo from "@/components/Logo";
 
 const NAV = [
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true, ownerOnly: true },
@@ -58,7 +59,7 @@ export default function AdminLayout() {
             <Droplets className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className="font-heading font-bold text-white">Ayurita</div>
+            <Logo className="text-[19px] text-white" />
             <div className="text-[10px] uppercase tracking-widest text-slate-500 -mt-0.5">Admin Console</div>
           </div>
         </div>

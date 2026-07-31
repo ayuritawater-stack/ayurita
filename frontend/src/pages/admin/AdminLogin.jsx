@@ -5,6 +5,7 @@ import { Droplets, ArrowRight, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import Logo from "@/components/Logo";
 
 export default function AdminLogin() {
   const nav = useNavigate();
@@ -43,7 +44,7 @@ export default function AdminLogin() {
               <Droplets className="w-5 h-5" />
             </div>
             <div>
-              <div className="font-heading font-bold text-lg">Ayurita</div>
+              <Logo className="text-[22px] text-white" />
               <div className="text-[10px] uppercase tracking-widest text-white/70 -mt-0.5">Admin Console</div>
             </div>
           </Link>

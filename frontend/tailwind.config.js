@@ -11,6 +11,7 @@ module.exports = {
         heading: ['Archivo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         serif: ['"Playfair Display"', 'ui-serif', 'Georgia', 'serif'],
+        logo: ['Poppins', 'Archivo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -63,6 +64,8 @@ module.exports = {
           'primary-hover': '#0D2C5C',
           secondary: '#4A6E8F',
           'secondary-hover': '#35526C',
+          logo: '#1153A0',
+          'logo-petal': '#D42128',
           emerald: '#D42128',
           'emerald-hover': '#B21A21',
           navy: '#0B2249',

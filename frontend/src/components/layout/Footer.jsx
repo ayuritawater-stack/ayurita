@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Droplets, Phone, Mail, MapPin, Facebook, Instagram, Linkedin } from "lucide-react";
 import { useSettings } from "@/lib/settings";
+import Logo from "@/components/Logo";
 
 export default function Footer() {
   const BUSINESS = useSettings();
@@ -13,7 +14,7 @@ export default function Footer() {
               <Droplets className="w-5 h-5 text-white" />
             </div>
             <div>
-              <div className="font-heading font-bold text-lg text-white">Ayurita</div>
+              <Logo className="text-[22px] text-white" />
               <div className="text-[10px] text-slate-400 uppercase tracking-widest -mt-0.5">Pure Water</div>
             </div>
           </div>
