@@ -4,12 +4,14 @@ app has no separate task queue/cron, so a long-lived asyncio task is the lightes
 recurring job without adding new infrastructure. Also callable on demand by an owner
 (routers/credit.py) for testing or an out-of-band nudge.
 """
+import asyncio
 import logging
 from datetime import datetime, timedelta
 
 from deps import db, now_utc, iso
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message
+from services.whatsapp_events import record_whatsapp_message_sent
 
 logger = logging.getLogger("ayurita.credit_reminders")
 
@@ -48,12 +50,14 @@ async def send_due_reminders() -> int:
             continue
 
         remaining = round(order.get("grand_total", 0) - order.get("amount_paid", 0), 2)
-        send_template_message(
+        result = await asyncio.to_thread(
+            send_template_message,
             phone,
             "credit_payment_reminder",
             body_parameters=[guest.get("contact_person", "Customer"), f"{remaining:.2f}", due_date.isoformat()],
             config=config,
         )
+        await record_whatsapp_message_sent(result, template="credit_payment_reminder", order_id=order.get("id"))
         await db.orders.update_one({"id": order["id"]}, {"$set": {"last_reminder_sent": today_iso}})
         sent += 1
 

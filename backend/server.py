@@ -29,6 +29,7 @@ from routers import questions as r_questions
 from routers import credit as r_credit
 from routers import returns as r_returns
 from routers import delivery as r_delivery
+from routers import whatsapp as r_whatsapp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ayurita")
@@ -67,6 +68,7 @@ api.include_router(r_credit.requests_router)
 api.include_router(r_credit.reminders_router)
 api.include_router(r_returns.router)
 api.include_router(r_delivery.router)
+api.include_router(r_whatsapp.router)
 
 app.include_router(api)
 
@@ -136,6 +138,9 @@ async def _create_indexes() -> None:
     await _create_index_safely(db.bulk_inquiries, "status")
     await _create_index_safely(db.contact_messages, [("created_at", -1)])
     await _create_index_safely(db.audit_logs, [("timestamp", -1)])
+    # WhatsApp delivery-status callbacks arrive keyed by message id and are upserted on it.
+    await _create_index_safely(db.whatsapp_message_events, "wamid", unique=True)
+    await _create_index_safely(db.whatsapp_message_events, [("created_at", -1)])
 
 
 async def _credit_reminder_loop():

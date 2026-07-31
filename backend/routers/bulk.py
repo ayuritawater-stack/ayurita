@@ -1,4 +1,5 @@
 """Bulk inquiries router."""
+import asyncio
 import logging
 from typing import Literal, Optional
 from fastapi import APIRouter, HTTPException, Depends, Request, Path
@@ -7,22 +8,25 @@ from deps import db, get_current_admin, new_id, now_utc, iso
 from models import BulkInquiryIn, BulkInquiryStatusUpdate
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message
+from services.whatsapp_events import record_whatsapp_message_sent
 
 router = APIRouter(tags=["bulk"])
 logger = logging.getLogger("ayurita")
 
 
-def _notify_bulk_inquiry_update(inquiry: dict) -> None:
+async def _notify_bulk_inquiry_update(inquiry: dict) -> None:
     phone = build_whatsapp_number(inquiry.get("phone", ""), get_whatsapp_config().default_country_code)
     if not phone:
         logger.info("WhatsApp bulk-inquiry notification skipped: no valid phone for inquiry %s", inquiry.get("id"))
         return
     try:
-        send_template_message(
+        result = await asyncio.to_thread(
+            send_template_message,
             phone,
             "bulk_inquiry_update",
             body_parameters=[inquiry.get("contact_person", "there"), inquiry.get("status", "updated")],
         )
+        await record_whatsapp_message_sent(result, template="bulk_inquiry_update", inquiry_id=inquiry.get("id"))
     except Exception:
         logger.exception("Failed to send WhatsApp bulk-inquiry notification for inquiry %s", inquiry.get("id"))
 
@@ -67,5 +71,5 @@ async def update_bulk_inquiry(
     if res.matched_count == 0:
         raise HTTPException(status_code=404, detail="Inquiry not found")
     updated = await db.bulk_inquiries.find_one({"id": inquiry_id}, {"_id": 0})
-    _notify_bulk_inquiry_update(updated)
+    await _notify_bulk_inquiry_update(updated)
     return updated
