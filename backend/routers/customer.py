@@ -1,4 +1,5 @@
 """Customer account router — signup, login, profile, password change, order history."""
+import asyncio
 import logging
 import secrets
 from datetime import datetime, timedelta
@@ -12,6 +13,7 @@ from models import (
 )
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message
+from services.whatsapp_events import record_whatsapp_message_sent
 
 router = APIRouter(prefix="/customer", tags=["customer"])
 logger = logging.getLogger("ayurita")
@@ -99,9 +101,19 @@ async def forgot_customer_password(body: CustomerForgotPasswordIn, request: Requ
         if phone and config.is_valid:
             try:
                 # password_reset is a Meta Authentication-category template - fixed,
-                # Meta-controlled body (security disclaimer + expiry), the only variable is the
-                # code itself.
-                send_template_message(phone, "password_reset", body_parameters=[otp], config=config)
+                # Meta-controlled body (security disclaimer + expiry), so the only body variable
+                # is the code itself. Its Copy-Code button needs that same code as a separate
+                # button parameter (see _build_template_components) or Meta rejects the send
+                # with #131008.
+                result = await asyncio.to_thread(
+                    send_template_message,
+                    phone,
+                    "password_reset",
+                    body_parameters=[otp],
+                    button_parameter=otp,
+                    config=config,
+                )
+                await record_whatsapp_message_sent(result, template="password_reset", customer_id=c["id"])
             except Exception:
                 logger.exception("Failed to send password reset WhatsApp OTP for customer %s", c["id"])
         else:

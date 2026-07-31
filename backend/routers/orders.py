@@ -1,4 +1,5 @@
 """Orders router."""
+import asyncio
 import logging
 from datetime import timedelta
 from typing import Literal, Optional, List
@@ -8,6 +9,7 @@ from deps import db, get_current_admin, get_current_customer, new_id, now_utc, i
 from models import OrderIn, OrderStatusUpdate, BulkStatusUpdate, CartItemIn, ORDER_NUMBER_REGEX
 from config.whatsapp import get_whatsapp_config
 from services.whatsapp_service import build_whatsapp_number, send_template_message, send_text_message
+from services.whatsapp_events import record_whatsapp_message_sent
 from routers.coupons import validate_coupon_doc
 from services.delivery import calculate_delivery_charge
 from security import get_client_ip
@@ -27,36 +29,54 @@ STATUS_WHATSAPP_TEMPLATES = {
     "cancelled": "Hi {name}, your order #{order_number} has been cancelled. Please contact us if you have any questions.",
 }
 
-# Statuses with a dedicated Meta-approved template name (to be created/approved once WhatsApp is
-# activated). Everything else uses the free-form text fallback above.
+# Exact template names as approved in Meta WhatsApp Manager, matching Kiran Traders' set one for
+# one - including the misspelled "dilivery", which is the real approved name there. This app's own
+# status values stay as they are (they are part of the API/DB contract); only what each one maps
+# to changed.
+WHATSAPP_TEMPLATE_ORDER_PENDING = "order_pending"
+WHATSAPP_TEMPLATE_ORDER_CONFIRMATION = "order_confirmation"
+WHATSAPP_TEMPLATE_ORDER_PACKED = "order_packed"
+WHATSAPP_TEMPLATE_ORDER_OUT_FOR_DELIVERY = "order_out_for_dilivery"
+WHATSAPP_TEMPLATE_ORDER_DELIVERED = "order_delivered"
+WHATSAPP_TEMPLATE_ORDER_CANCELLED = "order_cancelled"
+
+# "placed" is deliberately absent: that notification is sent once from order creation
+# (_notify_order_placed), not from a status transition. "processing" has no approved template on
+# the Kiran Traders side either, so it keeps using the free-form text fallback above.
 STATUS_TO_WHATSAPP_TEMPLATE = {
-    "confirmed": "order_confirmed",
-    "processing": "order_processing",
-    "packed": "order_packed",
-    "dispatched": "order_dispatched",
-    "delivered": "order_delivered",
-    "cancelled": "order_cancelled",
+    "confirmed": WHATSAPP_TEMPLATE_ORDER_CONFIRMATION,
+    "packed": WHATSAPP_TEMPLATE_ORDER_PACKED,
+    "dispatched": WHATSAPP_TEMPLATE_ORDER_OUT_FOR_DELIVERY,
+    "delivered": WHATSAPP_TEMPLATE_ORDER_DELIVERED,
+    "cancelled": WHATSAPP_TEMPLATE_ORDER_CANCELLED,
 }
-WHATSAPP_TEMPLATES_WITH_TOTAL_AMOUNT = {"order_cancelled"}
+
+# Templates whose body takes the order total as a 3rd parameter, on top of the
+# [customer_name, order_id] every lifecycle template starts with.
+WHATSAPP_TEMPLATES_WITH_TOTAL_AMOUNT = {WHATSAPP_TEMPLATE_ORDER_CONFIRMATION, WHATSAPP_TEMPLATE_ORDER_CANCELLED}
 
 
-def _notify_order_placed(order: dict) -> None:
+async def _notify_order_placed(order: dict) -> None:
     guest = order.get("guest") or {}
     phone = build_whatsapp_number(guest.get("phone", ""), get_whatsapp_config().default_country_code)
     if not phone:
         logger.info("WhatsApp order notification skipped: no valid phone for order %s", order.get("order_number"))
         return
     try:
-        send_template_message(
+        # The Graph call is blocking with a 15s timeout, so it goes to a worker thread rather
+        # than stalling the event loop for every other request while the order response waits.
+        result = await asyncio.to_thread(
+            send_template_message,
             phone,
-            "order_placed",
+            WHATSAPP_TEMPLATE_ORDER_PENDING,
             body_parameters=[guest.get("contact_person", "Customer"), order.get("order_number"), f"{order.get('grand_total', 0):.2f}"],
         )
+        await record_whatsapp_message_sent(result, template=WHATSAPP_TEMPLATE_ORDER_PENDING, order_id=order.get("id"))
     except Exception:
         logger.exception("Failed to send WhatsApp order-placed notification for order %s", order.get("order_number"))
 
 
-def _notify_order_status(order: dict) -> None:
+async def _notify_order_status(order: dict) -> None:
     guest = order.get("guest") or {}
     phone = build_whatsapp_number(guest.get("phone", ""), get_whatsapp_config().default_country_code)
     if not phone:
@@ -71,14 +91,16 @@ def _notify_order_status(order: dict) -> None:
             body_parameters = [name, order_number]
             if template_name in WHATSAPP_TEMPLATES_WITH_TOTAL_AMOUNT:
                 body_parameters.append(f"{order.get('grand_total', 0):.2f}")
-            send_template_message(phone, template_name, body_parameters=body_parameters)
+            result = await asyncio.to_thread(send_template_message, phone, template_name, body_parameters=body_parameters)
+            await record_whatsapp_message_sent(result, template=template_name, order_id=order.get("id"), status=status)
         else:
             text = STATUS_WHATSAPP_TEMPLATES.get(status, "Hi {name}, your order #{order_number} is now {status}.").format(
                 name=name, order_number=order_number, status=status
             )
             config = get_whatsapp_config()
             if config.is_valid:
-                send_text_message(config, phone, text)
+                result = await asyncio.to_thread(send_text_message, config, phone, text)
+                await record_whatsapp_message_sent(result, template="status_text", order_id=order.get("id"), status=status)
     except Exception:
         logger.exception("Failed to send WhatsApp status notification for order %s", order.get("order_number"))
 
@@ -272,7 +294,7 @@ async def create_order(body: OrderIn, request: Request, customer: dict = Depends
 
     await db.orders.insert_one(order)
     order.pop("_id", None)
-    _notify_order_placed(order)
+    await _notify_order_placed(order)
     return order
 
 
@@ -363,7 +385,7 @@ async def _apply_order_status(order_id: str, status: str, request: Request, admi
         updated_order = {**order, "status": status, "updated_at": now_str, "timeline": timeline}
     await record_audit(db, admin_email, get_client_ip(request), "update_order_status", order_id, {"status": status})
     if status != old_status:
-        _notify_order_status(updated_order)
+        await _notify_order_status(updated_order)
     return updated_order
 
 
