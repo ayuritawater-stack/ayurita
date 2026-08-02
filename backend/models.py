@@ -205,6 +205,11 @@ class GuestInfo(BaseModel):
     pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
     gst_number: Optional[str] = Field(None, max_length=20)
     notes: Optional[str] = Field(None, max_length=2000)
+    # Exact delivery point dropped on the map at checkout. Optional - a typed address is still a
+    # valid order - but when present it is what the delivery charge and the rider's directions
+    # link are built from, because a typed Begusarai address usually resolves only to the street.
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
 
     @field_validator("city")
     @classmethod
@@ -266,15 +271,21 @@ class CouponIn(BaseModel):
     expires_at: Optional[str] = Field(None, max_length=40)
 
 
+# Order lifecycle. "processing" was dropped because it was the one status with no approved
+# WhatsApp template behind it, so setting it sent a free-form text message that Meta rejects
+# outside the 24-hour customer-service window - i.e. the customer silently got nothing.
+ORDER_STATUSES = Literal["placed", "confirmed", "packed", "dispatched", "delivered", "cancelled"]
+
+
 class OrderStatusUpdate(BaseModel):
     model_config = _STRICT
-    status: Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]
+    status: ORDER_STATUSES
 
 
 class BulkStatusUpdate(BaseModel):
     model_config = _STRICT
     order_ids: List[str] = Field(min_length=1, max_length=200)
-    status: Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]
+    status: ORDER_STATUSES
 
 
 class BulkOrderIds(BaseModel):
@@ -401,6 +412,10 @@ class AddressIn(BaseModel):
     pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
     gst_number: Optional[str] = Field(None, max_length=20)
     is_default: bool = False
+    # Map pin saved with the address, so a returning customer keeps their exact gate/door
+    # location instead of re-dropping it at every checkout. See GuestInfo.lat above.
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
 
     # Same service-area rule as GuestInfo - a saved address the shop can't deliver to would only
     # fail later at checkout, so reject it up front.
@@ -426,6 +441,8 @@ class DeliveryEstimateIn(BaseModel):
     city: str = Field(min_length=1, max_length=100)
     state: str = Field("", max_length=100)
     pincode: str = Field(pattern=INDIAN_PINCODE_REGEX)
+    lat: Optional[float] = Field(None, ge=-90, le=90)
+    lng: Optional[float] = Field(None, ge=-180, le=180)
 
 
 class WishlistMerge(BaseModel):

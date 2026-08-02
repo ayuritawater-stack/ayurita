@@ -19,7 +19,7 @@ const sections = [
   },
   {
     title: "5. Order Confirmation & Fulfilment",
-    body: () => "An order is confirmed once placed; you will see live status updates (placed → confirmed → processing → packed → dispatched → delivered) in your account and via WhatsApp where a valid number is provided. We aim to confirm orders within 2 hours during business hours. Delivery timelines depend on order size, location and stock availability.",
+    body: () => "An order is confirmed once placed; you will see live status updates (placed → confirmed → packed → out for delivery → delivered) in your account and via WhatsApp where a valid number is provided. We aim to confirm orders within 2 hours during business hours. Delivery timelines depend on order size, location and stock availability.",
   },
   {
     title: "6. Cancellations & Returns",

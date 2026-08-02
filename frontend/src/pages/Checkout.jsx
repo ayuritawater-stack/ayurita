@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CouponDropdown from "@/components/CouponDropdown";
+import AddressPicker from "@/components/AddressPicker";
 
 const loadRazorpayScript = () =>
   new Promise((resolve, reject) => {
@@ -58,10 +59,15 @@ export default function Checkout() {
     pincode: "",
     gst_number: "",
     notes: "",
+    // Map pin, when the customer drops one. Null means "no pin" and the delivery charge falls
+    // back to geocoding the typed address - see services/delivery.py.
+    lat: null,
+    lng: null,
   });
   const [deliveryEstimate, setDeliveryEstimate] = useState(null);
   const [checkingDelivery, setCheckingDelivery] = useState(false);
   const [pincodeValid, setPincodeValid] = useState(null);
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
   const deliveryBlocked = !!(deliveryEstimate && deliveryEstimate.delivery_allowed === false);
   const cityStateValid = form.city.trim().toLowerCase() === "begusarai" && form.state.trim().toLowerCase() === "bihar";
   const pincodeComplete = form.pincode.length === 6;
@@ -92,7 +98,9 @@ export default function Checkout() {
       const def = data.find((a) => a.is_default) || data[0];
       if (def) {
         setSelectedAddressId(def.id);
-        setForm((f) => ({ ...f, address: def.address, city: def.city, state: def.state || f.state, pincode: def.pincode || f.pincode, gst_number: def.gst_number || f.gst_number }));
+        setForm((f) => ({ ...f, address: def.address, city: def.city, state: def.state || f.state, pincode: def.pincode || f.pincode, gst_number: def.gst_number || f.gst_number, lat: def.lat ?? null, lng: def.lng ?? null }));
+        // A saved address was already confirmed when it was saved, so don't ask again.
+        setAddressConfirmed(true);
       }
     }).catch(() => {});
   }, []);
@@ -100,7 +108,10 @@ export default function Checkout() {
   const selectAddress = (id) => {
     setSelectedAddressId(id);
     const a = addresses.find((x) => x.id === id);
-    if (a) setForm((f) => ({ ...f, address: a.address, city: a.city, state: a.state || f.state, pincode: a.pincode || f.pincode, gst_number: a.gst_number || f.gst_number }));
+    if (a) {
+      setForm((f) => ({ ...f, address: a.address, city: a.city, state: a.state || f.state, pincode: a.pincode || f.pincode, gst_number: a.gst_number || f.gst_number, lat: a.lat ?? null, lng: a.lng ?? null }));
+      setAddressConfirmed(true);
+    }
   };
 
   // Live delivery-charge check as the address is filled in, so a customer sees the charge (or
@@ -117,6 +128,9 @@ export default function Checkout() {
       try {
         const { data } = await api.post("/delivery/estimate", {
           address: form.address, city: form.city, state: form.state, pincode: form.pincode,
+          // Sent so the estimate measures from the actual pin when there is one, matching what
+          // create_order will charge - otherwise the quoted and billed shipping could differ.
+          lat: form.lat, lng: form.lng,
         });
         setDeliveryEstimate(data);
       } catch (err) {
@@ -126,7 +140,10 @@ export default function Checkout() {
       }
     }, 700);
     return () => clearTimeout(t);
-  }, [form.address, form.city, form.state, form.pincode, cityStateValid, pincodeValid]);
+    // lat/lng included so dropping or moving a pin re-quotes the shipping straight away -
+    // without them the customer would see a charge measured from the typed address while
+    // create_order billed from the pin.
+  }, [form.address, form.city, form.state, form.pincode, form.lat, form.lng, cityStateValid, pincodeValid]);
 
   // Check the pincode against the backend's allowlist of serviceable pincodes, so the customer
   // is told we don't deliver there while typing rather than on submit. The endpoint's answer is
@@ -351,7 +368,13 @@ export default function Checkout() {
                 )}
                 <div className="md:col-span-2">
                   <Label>Delivery Address *</Label>
-                  <Textarea required data-testid="checkout-address" value={form.address} onChange={(e) => set("address", e.target.value)} className="mt-1.5 rounded-xl min-h-[80px]" />
+                  <AddressPicker
+                    value={form}
+                    onChange={(patch) => setForm((f) => ({ ...f, ...patch }))}
+                    confirmed={addressConfirmed}
+                    onConfirmedChange={setAddressConfirmed}
+                    testIdPrefix="checkout-address"
+                  />
                 </div>
                 <div className="md:col-span-2">
                   <Label>Order Notes</Label>

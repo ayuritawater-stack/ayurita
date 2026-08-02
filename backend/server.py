@@ -31,6 +31,7 @@ from routers import questions as r_questions
 from routers import credit as r_credit
 from routers import returns as r_returns
 from routers import delivery as r_delivery
+from routers import places as r_places
 from routers import whatsapp as r_whatsapp
 
 logging.basicConfig(level=logging.INFO)
@@ -70,6 +71,7 @@ api.include_router(r_credit.requests_router)
 api.include_router(r_credit.reminders_router)
 api.include_router(r_returns.router)
 api.include_router(r_delivery.router)
+api.include_router(r_places.router)
 api.include_router(r_whatsapp.router)
 
 app.include_router(api)

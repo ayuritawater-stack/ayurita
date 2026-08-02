@@ -40,70 +40,87 @@ def _format_full_address(address) -> str:
 
 
 async def _geocode_address(full_address: str) -> Optional[Dict[str, Any]]:
-    """Resolve an address string to {lat, lng, city} via the Google Geocoding API.
-    Returns None on any failure (missing key, timeout, error status, network issue)."""
+    """Resolve an address string to {lat, lng, city} via Places API (New) Text Search.
+    Returns None on any failure (missing key, timeout, error status, network issue).
+
+    Uses Text Search rather than the Geocoding API because Google Cloud projects created after
+    the legacy-API cutoff cannot enable the legacy Geocoding API at all - on such a project every
+    delivery estimate silently fell through to flat shipping no matter what else was configured.
+    """
     api_key = _get_api_key()
     if not api_key:
         return None
     try:
         resp = await asyncio.to_thread(
-            requests.get,
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": full_address, "key": api_key, "region": "in"},
+            requests.post,
+            "https://places.googleapis.com/v1/places:searchText",
+            json={"textQuery": full_address, "regionCode": "in", "languageCode": "en", "maxResultCount": 1},
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": "places.location,places.addressComponents",
+            },
             timeout=GOOGLE_MAPS_TIMEOUT,
         )
         data = resp.json()
-        if data.get("status") != "OK" or not data.get("results"):
-            logger.warning(
-                "Geocoding API returned non-OK status for address %r: status=%s error_message=%s",
-                full_address, data.get("status"), data.get("error_message"),
-            )
+        if resp.status_code != 200:
+            message = (data.get("error") or {}).get("message", "") if isinstance(data, dict) else str(data)[:200]
+            logger.warning("Text Search geocode failed for address %r (%s): %s", full_address, resp.status_code, message)
             return None
-        result = data["results"][0]
-        loc = result["geometry"]["location"]
+        places = data.get("places") or []
+        if not places:
+            logger.warning("Text Search geocode returned no match for address: %s", full_address)
+            return None
+        loc = places[0].get("location") or {}
+        if "latitude" not in loc or "longitude" not in loc:
+            return None
         city = ""
-        for comp in result.get("address_components", []):
+        for comp in places[0].get("addressComponents", []):
             types = comp.get("types", [])
             if "locality" in types or "postal_town" in types or "administrative_area_level_2" in types:
-                city = comp.get("long_name", "")
+                city = comp.get("longText", "")
                 break
-        return {"lat": loc["lat"], "lng": loc["lng"], "city": city}
+        return {"lat": loc["latitude"], "lng": loc["longitude"], "city": city}
     except Exception:
         logger.warning("Geocoding request failed for address: %s", full_address, exc_info=True)
         return None
 
 
 async def _driving_distance_km(origin_lat: float, origin_lng: float, dest_lat: float, dest_lng: float) -> Optional[float]:
-    """Driving distance in km via the Google Distance Matrix API. Returns None on any failure."""
+    """Driving distance in km via the Routes API. Returns None on any failure, in which case
+    callers fall back to straight-line distance.
+
+    Uses Routes API rather than the legacy Distance Matrix API, which newer Google Cloud
+    projects cannot enable - same cutoff that affects _geocode_address above."""
     api_key = _get_api_key()
     if not api_key:
         return None
     try:
         resp = await asyncio.to_thread(
-            requests.get,
-            "https://maps.googleapis.com/maps/api/distancematrix/json",
-            params={
-                "origins": f"{origin_lat},{origin_lng}",
-                "destinations": f"{dest_lat},{dest_lng}",
-                "mode": "driving",
-                "key": api_key,
+            requests.post,
+            "https://routes.googleapis.com/distanceMatrix/v2:computeRouteMatrix",
+            json={
+                "origins": [{"waypoint": {"location": {"latLng": {"latitude": origin_lat, "longitude": origin_lng}}}}],
+                "destinations": [{"waypoint": {"location": {"latLng": {"latitude": dest_lat, "longitude": dest_lng}}}}],
+                "travelMode": "DRIVE",
+            },
+            headers={
+                "X-Goog-Api-Key": api_key,
+                "X-Goog-FieldMask": "originIndex,destinationIndex,distanceMeters,condition",
             },
             timeout=GOOGLE_MAPS_TIMEOUT,
         )
         data = resp.json()
-        if data.get("status") != "OK":
-            logger.warning(
-                "Distance Matrix API returned non-OK status: status=%s error_message=%s",
-                data.get("status"), data.get("error_message"),
-            )
+        if resp.status_code != 200:
+            message = (data.get("error") or {}).get("message", "") if isinstance(data, dict) else str(data)[:200]
+            logger.warning("Route matrix failed (%s): %s", resp.status_code, message)
             return None
-        element = data["rows"][0]["elements"][0]
-        if element.get("status") != "OK":
-            logger.warning("Distance Matrix API element status not OK: %s", element.get("status"))
-            return None
-        return element["distance"]["value"] / 1000.0
+        # computeRouteMatrix returns a JSON array of elements, one per origin/destination pair.
+        for element in (data if isinstance(data, list) else []):
+            if element.get("condition") == "ROUTE_EXISTS" and "distanceMeters" in element:
+                return element["distanceMeters"] / 1000.0
+        return None
     except Exception:
-        logger.warning("Distance Matrix request failed for (%s,%s) -> (%s,%s)", origin_lat, origin_lng, dest_lat, dest_lng, exc_info=True)
+        logger.warning("Route matrix request failed for (%s,%s) -> (%s,%s)", origin_lat, origin_lng, dest_lat, dest_lng, exc_info=True)
         return None
 
 
@@ -124,7 +141,17 @@ async def calculate_delivery_charge(address, settings: dict) -> Dict[str, Any]:
         return {"distance_km": 0.0, "shipping": shipping_flat, "delivery_allowed": True, "reason": None, "used_fallback": True}
 
     full_address = _format_full_address(address)
-    geocode = await _geocode_address(full_address)
+    # A pin the customer dropped on the map beats geocoding their typed address: the typed text
+    # usually resolves only to the street, and the pin is what the rider actually needs. It also
+    # skips a Places call entirely. City is left blank here - the pin was already checked against
+    # the pincode allowlist when it was dropped (routers/places.py), and the order's own
+    # validators check it again, so there is no resolved city to re-test against.
+    pin_lat = getattr(address, "lat", None)
+    pin_lng = getattr(address, "lng", None)
+    if pin_lat is not None and pin_lng is not None:
+        geocode = {"lat": pin_lat, "lng": pin_lng, "city": service_city}
+    else:
+        geocode = await _geocode_address(full_address)
     if geocode is None:
         logger.warning("Falling back to flat shipping - could not geocode address: %s", full_address)
         return {"distance_km": 0.0, "shipping": shipping_flat, "delivery_allowed": True, "reason": None, "used_fallback": True}

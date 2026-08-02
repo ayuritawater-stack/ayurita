@@ -13,6 +13,9 @@ async def analytics_summary(admin: dict = Depends(require_owner)):
         orders = await db.orders.find({}, {"_id": 0}).to_list(5000)
         total_revenue = sum(o.get("grand_total", 0) for o in orders if o.get("status") != "cancelled")
         total_orders = len(orders)
+        # "processing" is a retired status (models.ORDER_STATUSES) - kept in this count so any
+        # order stored with it before it was retired still shows up as pending rather than
+        # silently dropping out of the dashboard.
         pending = sum(1 for o in orders if o.get("status") in ("placed", "confirmed", "processing", "packed"))
         delivered = sum(1 for o in orders if o.get("status") == "delivered")
 

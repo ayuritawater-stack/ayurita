@@ -10,16 +10,20 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import AddressPicker from "@/components/AddressPicker";
 
 const statusColor = {
   placed: "bg-amber-500/10 text-amber-700 border-amber-500/20",
   confirmed: "bg-sky-500/10 text-sky-700 border-sky-500/20",
-  processing: "bg-cyan-500/10 text-cyan-700 border-cyan-500/20",
   packed: "bg-indigo-500/10 text-indigo-700 border-indigo-500/20",
   dispatched: "bg-purple-500/10 text-purple-700 border-purple-500/20",
   delivered: "bg-emerald-500/10 text-emerald-700 border-emerald-500/20",
   cancelled: "bg-red-500/10 text-red-700 border-red-500/20",
 };
+
+// Matches the tracking page and the admin panel - customers see "Out for Delivery", never the
+// raw "dispatched" value the order actually carries.
+const statusLabel = (s) => (s === "dispatched" ? "Out for Delivery" : s);
 
 const emptyProfile = { business_name: "", contact_person: "", email: "", phone: "", address: "", city: "", gst_number: "" };
 
@@ -40,6 +44,7 @@ export default function Account() {
 
   const [addresses, setAddresses] = useState([]);
   const [addressForm, setAddressForm] = useState(null);
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
   const [savingAddress, setSavingAddress] = useState(false);
 
   const [creditRequests, setCreditRequests] = useState([]);
@@ -180,10 +185,11 @@ export default function Account() {
     }
   };
 
-  const emptyAddressForm = { label: "", address: "", city: "", state: "", pincode: "", gst_number: "", is_default: false };
+  const emptyAddressForm = { label: "", address: "", city: "", state: "", pincode: "", gst_number: "", is_default: false, lat: null, lng: null };
 
-  const startAddAddress = () => setAddressForm({ ...emptyAddressForm });
-  const startEditAddress = (a) => setAddressForm({ ...a });
+  const startAddAddress = () => { setAddressForm({ ...emptyAddressForm }); setAddressConfirmed(false); };
+  // An address being edited was already confirmed when it was first saved.
+  const startEditAddress = (a) => { setAddressForm({ ...a }); setAddressConfirmed(true); };
   const cancelAddressForm = () => setAddressForm(null);
   const updAddress = (k, v) => setAddressForm((f) => ({ ...f, [k]: v }));
 
@@ -199,8 +205,8 @@ export default function Account() {
         // Our backend is unreachable - don't block the save on it. POST/PUT /customer/addresses
         // validates the pincode against the same allowlist, so an out-of-area one still fails.
       }
-      const { id, label, address, city, state, pincode, gst_number, is_default } = addressForm;
-      const payload = { label, address, city, state, pincode, gst_number: gst_number || null, is_default };
+      const { id, label, address, city, state, pincode, gst_number, is_default, lat, lng } = addressForm;
+      const payload = { label, address, city, state, pincode, gst_number: gst_number || null, is_default, lat: lat ?? null, lng: lng ?? null };
       if (id) {
         const { data } = await api.put(`/customer/addresses/${id}`, payload);
         setAddresses((prev) => prev.map((a) => (a.id === id ? data : (data.is_default ? { ...a, is_default: false } : a))));
@@ -366,7 +372,13 @@ export default function Account() {
                     </div>
                     <div className="sm:col-span-2">
                       <Label className="text-xs text-slate-500">Address</Label>
-                      <Input required value={addressForm.address} onChange={(e) => updAddress("address", e.target.value)} />
+                      <AddressPicker
+                        value={addressForm}
+                        onChange={(patch) => setAddressForm((f) => ({ ...f, ...patch }))}
+                        confirmed={addressConfirmed}
+                        onConfirmedChange={setAddressConfirmed}
+                        testIdPrefix="account-address"
+                      />
                     </div>
                     <div>
                       <Label className="text-xs text-slate-500">State</Label>
@@ -532,8 +544,8 @@ export default function Account() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="font-mono text-xs text-slate-500 truncate">{o.order_number}</div>
-                      <Badge variant="outline" className={`shrink-0 ${statusColor[o.status] || ""}`}>
-                        {o.status}
+                      <Badge variant="outline" className={`shrink-0 capitalize ${statusColor[o.status] || ""}`}>
+                        {statusLabel(o.status)}
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between mt-1">

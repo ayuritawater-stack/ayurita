@@ -1,16 +1,29 @@
 import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle, Archive } from "lucide-react";
+import { Eye, X, User, MapPin, Phone, Mail, Package, FileDown, AlertTriangle, Archive, Navigation } from "lucide-react";
 import { api, formatINR, downloadFile } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import MapPreview from "@/components/MapPreview";
+import { mapsDirectionsUrl } from "@/lib/googleMaps";
 
-const STATUSES = ["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"];
+const hasPin = (order) => order?.guest?.lat != null && order?.guest?.lng != null;
+const addressQuery = (order) =>
+  [order?.guest?.address, order?.guest?.city, order?.guest?.state, order?.guest?.pincode]
+    .filter(Boolean).join(", ");
+
+const STATUSES = ["placed", "confirmed", "packed", "dispatched", "delivered", "cancelled"];
+
+// "dispatched" is the value stored on the order and sent to the API; "Out for Delivery" is what
+// it is called everywhere a person reads it - the customer tracking page (OrderTracking.jsx) and
+// the order_out_for_dilivery WhatsApp template it fires. Showing the raw value here made the
+// admin panel look like it was a different stage from the one the customer was notified about.
+const STATUS_LABELS = { dispatched: "Out for Delivery" };
+const statusLabel = (s) => STATUS_LABELS[s] || s;
 
 const statusStyles = {
   placed: "!bg-sky-50 !text-brand-primary",
   confirmed: "!bg-blue-50 !text-blue-700",
-  processing: "!bg-amber-50 !text-amber-600",
   packed: "!bg-indigo-50 !text-indigo-600",
   dispatched: "!bg-violet-50 !text-violet-600",
   delivered: "!bg-emerald-50 !text-brand-emerald",
@@ -44,7 +57,7 @@ export default function AdminOrders() {
   const toggleSelectAll = () => setSelected((s) => (s.length === orders.length ? [] : orders.map((o) => o.id)));
 
   const applyBulkStatus = async () => {
-    if (!window.confirm(`Update ${selected.length} order(s) to "${bulkStatus}"?`)) return;
+    if (!window.confirm(`Update ${selected.length} order(s) to "${statusLabel(bulkStatus)}"?`)) return;
     setApplyingBulk(true);
     try {
       const { data } = await api.put("/admin/orders/bulk/status", { order_ids: selected, status: bulkStatus });
@@ -134,7 +147,7 @@ export default function AdminOrders() {
             <SelectTrigger className="w-40 rounded-xl" data-testid="orders-filter"><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{statusLabel(s)}</SelectItem>)}
             </SelectContent>
           </Select>
           <button onClick={exportCSV} className="btn-secondary" data-testid="export-orders">Export CSV</button>
@@ -147,7 +160,7 @@ export default function AdminOrders() {
           <Select value={bulkStatus} onValueChange={setBulkStatus}>
             <SelectTrigger className="w-40 rounded-xl" data-testid="bulk-status-select"><SelectValue /></SelectTrigger>
             <SelectContent>
-              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+              {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{statusLabel(s)}</SelectItem>)}
             </SelectContent>
           </Select>
           <button onClick={applyBulkStatus} disabled={applyingBulk} className="btn-secondary" data-testid="apply-bulk-status">
@@ -210,7 +223,7 @@ export default function AdminOrders() {
                 <td className="px-6 py-3">{o.items?.length}</td>
                 <td className="px-6 py-3 font-semibold">{formatINR(o.grand_total)}</td>
                 <td className="px-6 py-3">
-                  <span className={`chip capitalize ${statusStyles[o.status] || ""}`}>{o.status}</span>
+                  <span className={`chip capitalize ${statusStyles[o.status] || ""}`}>{statusLabel(o.status)}</span>
                 </td>
                 <td className="px-6 py-3 text-xs text-slate-500">
                   {new Date(o.created_at).toLocaleDateString("en-IN")}
@@ -252,7 +265,7 @@ export default function AdminOrders() {
                 <Select value={detail.status} onValueChange={(v) => changeStatus(detail.id, v)}>
                   <SelectTrigger className="rounded-xl"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{s}</SelectItem>)}
+                    {STATUSES.map((s) => <SelectItem key={s} value={s} className="capitalize">{statusLabel(s)}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -267,6 +280,34 @@ export default function AdminOrders() {
                   {detail.guest?.gst_number && <div className="text-xs text-slate-500">GST: {detail.guest.gst_number}</div>}
                   {detail.guest?.notes && <div className="text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">Notes: {detail.guest.notes}</div>}
                 </div>
+              </div>
+
+              {/* Where the delivery actually goes. A pin is only present when the customer
+                  dropped one at checkout; for orders placed before pinning existed (or by
+                  someone who typed the address), fall back to a Maps search on the address so
+                  dispatch still has a one-click route. */}
+              <div>
+                <div className="text-xs uppercase tracking-wider text-slate-500 mb-2">Delivery Location</div>
+                {hasPin(detail) ? (
+                  <>
+                    <MapPreview lat={detail.guest.lat} lng={detail.guest.lng} height={180} />
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                      <span className="text-slate-500">Pinned at {Number(detail.guest.lat).toFixed(5)}, {Number(detail.guest.lng).toFixed(5)}</span>
+                      <a href={mapsDirectionsUrl(detail.guest.lat, detail.guest.lng)} target="_blank" rel="noreferrer"
+                        className="text-brand-primary hover:underline inline-flex items-center gap-1" data-testid="order-directions">
+                        <Navigation className="w-3.5 h-3.5" /> Directions
+                      </a>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-xs text-slate-500">
+                    No map pin on this order ·{" "}
+                    <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressQuery(detail))}`}
+                      target="_blank" rel="noreferrer" className="text-brand-primary hover:underline">
+                      search this address on Maps
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="card-premium p-4">

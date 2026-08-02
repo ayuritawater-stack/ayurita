@@ -273,7 +273,7 @@ class TestOrders:
         body = {"items": [{"product_id": p["id"], "quantity": 5}], "guest": self._guest()}
         r = api_client.post(f"{API}/orders", json=body)
         oid = r.json()["id"]
-        for status in ["confirmed", "processing", "packed", "dispatched", "delivered"]:
+        for status in ["confirmed", "packed", "dispatched", "delivered"]:
             r = api_client.put(f"{API}/admin/orders/{oid}/status", headers=admin_headers, json={"status": status})
             assert r.status_code == 200
 

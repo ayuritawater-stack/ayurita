@@ -22,7 +22,6 @@ logger = logging.getLogger("ayurita")
 # Kiran Traders uses for statuses that don't have a Meta-approved template yet.
 STATUS_WHATSAPP_TEMPLATES = {
     "confirmed": "Hi {name}, your order #{order_number} has been confirmed.",
-    "processing": "Hi {name}, your order #{order_number} is being processed.",
     "packed": "Hi {name}, your order #{order_number} has been packed and is ready for dispatch.",
     "dispatched": "Hi {name}, your order #{order_number} is dispatched and should arrive shortly.",
     "delivered": "Hi {name}, your order #{order_number} has been delivered. Thank you for shopping with Ayurita.",
@@ -40,9 +39,15 @@ WHATSAPP_TEMPLATE_ORDER_OUT_FOR_DELIVERY = "order_out_for_dilivery"
 WHATSAPP_TEMPLATE_ORDER_DELIVERED = "order_delivered"
 WHATSAPP_TEMPLATE_ORDER_CANCELLED = "order_cancelled"
 
-# "placed" is deliberately absent: that notification is sent once from order creation
-# (_notify_order_placed), not from a status transition. "processing" has no approved template on
-# the Kiran Traders side either, so it keeps using the free-form text fallback above.
+# Every status an admin can set now has its own approved template, so the free-form fallback
+# above only ever applies to "placed" - which is deliberately absent here because that
+# notification is sent once from order creation (_notify_order_placed), not from a transition.
+#
+# "dispatched" is the stored status value and order_out_for_dilivery is the template it fires;
+# the two are named differently because the status is part of the API/DB contract and the
+# template name is fixed by what is approved in WhatsApp Manager (misspelling included). Both are
+# shown to humans as "Out for Delivery" - see STATUS_LABELS in AdminOrders.jsx and STAGES in
+# OrderTracking.jsx.
 STATUS_TO_WHATSAPP_TEMPLATE = {
     "confirmed": WHATSAPP_TEMPLATE_ORDER_CONFIRMATION,
     "packed": WHATSAPP_TEMPLATE_ORDER_PACKED,
@@ -309,6 +314,9 @@ async def track_order(request: Request, order_number: str = Path(pattern=ORDER_N
 
 @router.get("/admin/orders")
 async def admin_list_orders(
+    # "processing" is no longer settable (see models.ORDER_STATUSES) but stays accepted here:
+    # this is a read-only filter, and any order stored with that status before it was retired
+    # would otherwise be unreachable except by listing everything.
     status: Optional[Literal["placed", "confirmed", "processing", "packed", "dispatched", "delivered", "cancelled"]] = None,
     customer_id: Optional[str] = None,
     admin: dict = Depends(get_current_admin),
