@@ -1,4 +1,4 @@
-"""Distance-based delivery charge and Indian pincode verification.
+"""Distance-based delivery charge.
 
 Delivery charge is driving-distance from the shop (settings.shop_lat/shop_lng) to the
 customer's address, billed at settings.delivery_rate_per_km, restricted to addresses that
@@ -163,47 +163,5 @@ async def calculate_delivery_charge(address, settings: dict) -> Dict[str, Any]:
     }
 
 
-_pincode_cache: Dict[str, Dict[str, Any]] = {}
-
-
-async def verify_indian_pincode(pincode: str) -> Optional[Dict[str, Any]]:
-    """Look up a 6-digit Indian PIN code via the India Post public API to confirm it's a real,
-    existing pincode (not just 6 digits). Returns {'found': True, 'city', 'state'} if it exists,
-    {'found': False} if the API confirms it doesn't, or None if the lookup itself failed (so
-    callers can fail open rather than blocking on an unreachable third-party API).
-
-    Successful lookups are cached in-memory by pincode, and a connection error is retried once
-    before failing open - the India Post API frequently drops the connection (RemoteDisconnected)
-    on the first attempt."""
-    if pincode in _pincode_cache:
-        return _pincode_cache[pincode]
-
-    for attempt in range(2):
-        try:
-            resp = await asyncio.to_thread(
-                requests.get,
-                f"https://api.postalpincode.in/pincode/{pincode}",
-                timeout=GOOGLE_MAPS_TIMEOUT,
-            )
-            data = resp.json()
-            if not data or "Status" not in data[0]:
-                return None
-            if data[0].get("Status") != "Success":
-                result = {"found": False}
-            else:
-                offices = data[0].get("PostOffice") or []
-                if not offices:
-                    result = {"found": False}
-                else:
-                    office = offices[0]
-                    result = {"found": True, "city": office.get("District", ""), "state": office.get("State", "")}
-            _pincode_cache[pincode] = result
-            return result
-        except requests.exceptions.ConnectionError:
-            if attempt == 0:
-                continue
-            logger.warning("Pincode verification request failed for %s", pincode)
-            return None
-        except Exception:
-            logger.warning("Pincode verification request failed for %s", pincode)
-            return None
+# The India Post pincode lookup that used to live here was removed when models.SERVICE_PINCODES
+# became the explicit allowlist of serviceable pincodes - see routers/delivery.py::check_pincode.

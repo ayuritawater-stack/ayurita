@@ -194,9 +194,10 @@ export default function Account() {
     try {
       try {
         const { data: check } = await api.get(`/pincode/${addressForm.pincode}/verify`);
-        if (check.valid === false) { toast.error("Enter a valid pincode — this pincode does not exist"); setSavingAddress(false); return; }
+        if (check.valid === false) { toast.error("Delivery is not available at this pincode"); setSavingAddress(false); return; }
       } catch {
-        // lookup unavailable - fail open, don't block saving the address
+        // Our backend is unreachable - don't block the save on it. POST/PUT /customer/addresses
+        // validates the pincode against the same allowlist, so an out-of-area one still fails.
       }
       const { id, label, address, city, state, pincode, gst_number, is_default } = addressForm;
       const payload = { label, address, city, state, pincode, gst_number: gst_number || null, is_default };

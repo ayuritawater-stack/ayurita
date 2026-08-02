@@ -156,13 +156,23 @@ class CartItemIn(BaseModel):
 
 
 # Delivery is Begusarai-only. The geocoding-based service-area check in services/delivery.py
-# fails open when Google Maps is unavailable, and the India Post pincode lookup is only a UI
-# hint - so the checkout address itself must enforce the service area, otherwise POST /orders
-# accepts any 6-digit pincode as long as the city/state text reads right. All Begusarai-district
-# pincodes share this prefix (e.g. 851101, 851129).
+# fails open when Google Maps is unavailable, so the checkout address itself must enforce the
+# service area, otherwise POST /orders accepts any 6-digit pincode as long as the city/state
+# text reads right.
+#
+# This explicit allowlist is the single authority on where we deliver - it replaced a
+# `startswith("851")` prefix test, which was both too broad (851 covers pincodes outside the
+# delivery area) and too narrow (848201 is served but is not an 851 code). Every consumer -
+# the order/address validators below, GET /pincode/{code}/verify, and the checkout UI - reads
+# this same set, so adding or dropping a serviceable pincode is a one-line change here.
 SERVICE_CITY = "begusarai"
 SERVICE_STATE = "bihar"
-SERVICE_PINCODE_PREFIX = "851"
+SERVICE_PINCODES = frozenset({
+    "851101", "851112", "851113", "851114", "851115", "851116", "851117",
+    "851118", "851126", "851127", "851128", "851129", "851130", "851131",
+    "851133", "851134", "851135", "851156", "851211", "851212", "851213",
+    "851214", "851215", "851216", "851217", "851218", "848201",
+})
 
 
 def _validate_service_area_city(v: str) -> str:
@@ -178,8 +188,8 @@ def _validate_service_area_state(v: str) -> str:
 
 
 def _validate_service_area_pincode(v: str) -> str:
-    if not v.startswith(SERVICE_PINCODE_PREFIX):
-        raise ValueError("This pincode is outside our Begusarai delivery area")
+    if v.strip() not in SERVICE_PINCODES:
+        raise ValueError("Delivery is not available at this pincode")
     return v
 
 

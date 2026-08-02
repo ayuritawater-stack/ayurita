@@ -128,10 +128,10 @@ export default function Checkout() {
     return () => clearTimeout(t);
   }, [form.address, form.city, form.state, form.pincode, cityStateValid, pincodeValid]);
 
-  // Verify the pincode actually exists AND falls within Begusarai (via India Post lookup on the
-  // backend) rather than just checking it's 6 digits - best-effort, fails open if the lookup
-  // itself is unavailable (we only have a service area of one city, so any pincode we can't
-  // place is treated as out-of-area rather than merely "doesn't exist").
+  // Check the pincode against the backend's allowlist of serviceable pincodes, so the customer
+  // is told we don't deliver there while typing rather than on submit. The endpoint's answer is
+  // final - it is a straight lookup in models.SERVICE_PINCODES with no third-party call behind
+  // it, so there is no "couldn't check" case to interpret here any more.
   useEffect(() => {
     if (form.pincode.length !== 6) {
       setPincodeValid(null);
@@ -141,15 +141,11 @@ export default function Checkout() {
     const t = setTimeout(async () => {
       try {
         const { data } = await api.get(`/pincode/${form.pincode}/verify`);
-        if (cancelled) return;
-        // When the India Post lookup itself failed, the backend already falls back to a static
-        // Begusarai-prefix check (data.valid) rather than blindly passing everything.
-        if (!data.checked) { setPincodeValid(data.valid); return; }
-        const inBegusarai = data.valid && (data.city || "").trim().toLowerCase().includes("begusarai");
-        setPincodeValid(inBegusarai);
+        if (!cancelled) setPincodeValid(!!data.valid);
       } catch (err) {
-        // Couldn't even reach our backend - fall back to the same prefix check client-side.
-        if (!cancelled) setPincodeValid(form.pincode.startsWith("851"));
+        // Our own backend is unreachable - leave it unjudged rather than guessing. The order
+        // itself is validated server-side against the same list, so nothing slips through.
+        if (!cancelled) setPincodeValid(null);
       }
     }, 500);
     return () => { cancelled = true; clearTimeout(t); };
@@ -198,7 +194,7 @@ export default function Checkout() {
       return toast.error("Delivery is available in Begusarai only");
     }
     if (!form.pincode || form.pincode.length !== 6) return toast.error("Enter a valid pincode");
-    if (pincodeValid === false) return toast.error("Invalid pincode — delivery is available in Begusarai only");
+    if (pincodeValid === false) return toast.error("Delivery is not available at this pincode");
     if (deliveryBlocked) return toast.error(deliveryEstimate.reason || "Delivery is not available at this address");
     setSubmitting(true);
 
@@ -336,7 +332,7 @@ export default function Checkout() {
                     className="mt-1.5 rounded-xl"
                     aria-invalid={pincodeValid === false}
                   />
-                  {pincodeValid === false && <div className="text-xs text-rose-600 mt-1">Invalid pincode — delivery is available in Begusarai only</div>}
+                  {pincodeValid === false && <div className="text-xs text-rose-600 mt-1">Delivery is not available at this pincode</div>}
                 </div>
                 {addresses.length > 0 && (
                   <div className="md:col-span-2">
