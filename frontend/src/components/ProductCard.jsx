@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ShoppingCart, ArrowUpRight, Heart, Scale } from "lucide-react";
+import { ShoppingCart, ArrowUpRight, Heart, Scale, Minus, Plus } from "lucide-react";
 import { formatINR } from "@/lib/api";
 import { useCart } from "@/lib/cart";
 import { useWishlist } from "@/lib/wishlist";
@@ -10,16 +10,38 @@ import { toast } from "sonner";
 import FramedImage from "@/components/FramedImage";
 
 export default function ProductCard({ product, index = 0 }) {
-  const { addItem } = useCart();
+  const { addItem, updateQty, removeItem, items } = useCart();
   const { toggle: toggleWl, has: inWl } = useWishlist();
   const { toggle: toggleCompare, has: inCompare } = useCompare();
   const onSale = isFlashSaleActive(product);
+  // Once the product is in the cart the Add button becomes a stepper, so quantity can be
+  // adjusted from the grid without opening the product or the cart drawer.
+  const cartItem = items.find((i) => i.product_id === product.id);
+  const moq = product.moq || 1;
+  const atStockLimit = (product.stock || 0) > 0 && cartItem && cartItem.quantity >= product.stock;
 
   const handleAdd = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    addItem(product, product.moq || 1);
-    toast.success(`${product.name} added to cart`, { description: `MOQ ${product.moq || 1} units` });
+    addItem(product, moq);
+    toast.success(`${product.name} added to cart`, { description: `MOQ ${moq} units` });
+  };
+  // Stepping below MOQ isn't a valid order line, so the minus removes the item entirely and
+  // restores the Add button rather than leaving an unorderable quantity in the cart.
+  const handleDec = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (cartItem.quantity - 1 < moq) {
+      removeItem(product.id);
+      toast(`${product.name} removed from cart`);
+    } else {
+      updateQty(product.id, cartItem.quantity - 1);
+    }
+  };
+  const handleInc = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    updateQty(product.id, cartItem.quantity + 1);
   };
   const handleWl = (e) => {
     e.preventDefault();
@@ -109,14 +131,42 @@ export default function ProductCard({ product, index = 0 }) {
             )}
           </div>
           <div className="flex gap-1.5">
-            <button
-              onClick={handleAdd}
-              className="w-10 h-10 rounded-full bg-brand-primary text-white flex items-center justify-center hover:bg-brand-primary-hover transition"
-              data-testid={`add-to-cart-${product.slug}`}
-              aria-label="Add to cart"
-            >
-              <ShoppingCart className="w-4 h-4" />
-            </button>
+            {cartItem ? (
+              <div
+                className="h-10 flex items-center rounded-full bg-brand-primary text-white"
+                data-testid={`qty-stepper-${product.slug}`}
+              >
+                <button
+                  onClick={handleDec}
+                  className="w-9 h-10 rounded-l-full flex items-center justify-center hover:bg-brand-primary-hover transition"
+                  data-testid={`qty-minus-${product.slug}`}
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+                <span className="min-w-[26px] text-center text-sm font-semibold tabular-nums" data-testid={`qty-value-${product.slug}`}>
+                  {cartItem.quantity}
+                </span>
+                <button
+                  onClick={handleInc}
+                  disabled={atStockLimit}
+                  className="w-9 h-10 rounded-r-full flex items-center justify-center hover:bg-brand-primary-hover transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-brand-primary"
+                  data-testid={`qty-plus-${product.slug}`}
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleAdd}
+                className="w-10 h-10 rounded-full bg-brand-primary text-white flex items-center justify-center hover:bg-brand-primary-hover transition"
+                data-testid={`add-to-cart-${product.slug}`}
+                aria-label="Add to cart"
+              >
+                <ShoppingCart className="w-4 h-4" />
+              </button>
+            )}
             <Link
               to={`/products/${product.slug}`}
               className="w-10 h-10 rounded-full bg-slate-50 text-slate-700 flex items-center justify-center hover:bg-slate-100 transition"
