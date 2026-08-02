@@ -3,6 +3,8 @@ import os
 import asyncio
 import logging
 from fastapi import FastAPI, APIRouter, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.middleware.cors import CORSMiddleware
 
@@ -90,6 +92,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request: Request, exc: RequestValidationError):
+    # FastAPI's built-in handler returns the field errors to the client but logs nothing, so a
+    # 422 in production shows up as a bare status code with no way to tell which field failed.
+    # This logs the field path and reason for each error while keeping the response body
+    # byte-for-byte what the default handler produces, so the frontend sees no change.
+    #
+    # Only loc/type/msg are logged - never the rejected value, which for /orders would be the
+    # customer's name, phone and address.
+    safe_errors = [
+        {"loc": ".".join(str(part) for part in err.get("loc", ())), "type": err.get("type"), "msg": err.get("msg")}
+        for err in exc.errors()
+    ]
+    logger.warning("Request validation failed on %s %s: %s", request.method, request.url.path, safe_errors)
+    return JSONResponse(
+        status_code=422,
+        content=jsonable_encoder({"detail": exc.errors(), "body": exc.body}),
+    )
 
 
 @app.exception_handler(Exception)
